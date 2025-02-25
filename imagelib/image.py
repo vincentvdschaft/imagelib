@@ -478,6 +478,17 @@ class Image:
         gridpoints represent the center of the pixels."""
         return _correct_imshow_extent(self.extent, self.shape)
 
+    @classmethod
+    def test_image(cls):
+        """Create a test image."""
+        n_x, n_y = 129, 129
+        extent = (-10, 10, 0, 15)
+        x, y = np.meshgrid(
+            np.linspace(-1, 1, n_x), np.linspace(-1, 1, n_y), indexing="ij"
+        )
+        data = np.sin(2 * np.pi * x) * np.cos(2 * np.pi * y) * (x**2)
+        return cls(data, extent=extent)
+
 
 def _correct_imshow_extent(extent, shape):
     """Corrects the extent of an image to ensure the min and max
