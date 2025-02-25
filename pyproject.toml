@@ -1,0 +1,15 @@
+[project]
+name = "imagelib"
+version = "0.1.0"
+description = "Module proving an image class with various image processing methods."
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "h5py>=3.13.0",
+    "matplotlib>=3.10.0",
+    "numpy>=2.2.3",
+    "scipy>=1.15.2",
+]
+
+[dependency-groups]
+dev = ["pytest>=8.3.4"]
