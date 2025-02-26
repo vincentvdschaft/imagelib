@@ -160,9 +160,11 @@ class Image:
             else:
                 new_slice = slice(
                     slice_input.start if slice_input.start is not None else 0,
-                    slice_input.stop
-                    if slice_input.stop is not None
-                    else self.shape[dim],
+                    (
+                        slice_input.stop
+                        if slice_input.stop is not None
+                        else self.shape[dim]
+                    ),
                     slice_input.step,
                 )
             slices.append(new_slice)
@@ -247,7 +249,7 @@ class Image:
     @property
     def metadata(self):
         """Return metadata of image."""
-        return deepcopy(self._metadata)
+        return self._metadata
 
     @metadata.setter
     def metadata(self, value):
@@ -292,15 +294,15 @@ class Image:
 
     @property
     def grid(self):
-        """Return grid of image."""
+        """Return grid of image of shape (n_x, n_y, 2)."""
 
         x_grid, y_grid = np.meshgrid(self.x_vals, self.y_vals, indexing="ij")
-        return x_grid, y_grid
+        return np.stack([x_grid, y_grid], axis=-1)
 
     @property
     def flatgrid(self):
         """Return flat grid of image."""
-        return np.stack(self.grid, axis=-1).reshape(-1, 2)
+        return self.grid.reshape(-1, 2)
 
     @property
     def aspect(self):
@@ -361,50 +363,6 @@ class Image:
         """Converts the image to linear pixel values [0, 1]."""
         return self.map_range(0.0, 1.0).set_scale(SCALE_LINEAR)
 
-    def __add__(self, other):
-        """Add two images together."""
-        if isinstance(other, (int, float, np.number)):
-            data = self.data + other
-            return Image(
-                data, extent=self.extent, scale=self.scale, metadata=self.metadata
-            )
-
-        if isinstance(other, Image):
-            assert all([e1 == e2 for e1, e2 in zip(self.extent, other.extent)])
-            assert self.scale == other.scale
-            data = self.data + other.data
-            return Image(
-                data, extent=self.extent, scale=self.scale, metadata=self.metadata
-            )
-
-        other = np.array(other)
-        data = self.data + other
-        return Image(data, extent=self.extent, scale=self.scale, metadata=self.metadata)
-
-    def __mul__(self, other):
-        """Multiply image."""
-        if isinstance(other, Image):
-            other = other.data
-
-        data = self.data * other
-        return Image(data, extent=self.extent, scale=self.scale, metadata=self.metadata)
-
-    def __rmul__(self, other):
-        """Multiply image."""
-        return self.__mul__(other)
-
-    def __truediv__(self, other):
-        """Divide image."""
-        if isinstance(other, Image):
-            other = other.data
-
-        data = self.data / other
-        return Image(data, extent=self.extent, scale=self.scale, metadata=self.metadata)
-
-    def __sub__(self, other):
-        """Subtract two images."""
-        return self + (other * -1)
-
     def resample(self, shape, extent=None, method="linear"):
         """Resample image to a new shape."""
 
@@ -461,16 +419,26 @@ class Image:
         return Image(data, extent=extent, scale=self.scale, metadata=self.metadata)
 
     def xflip(self):
-        """Flip image data along x-axis."""
+        """Flip image data along x-axis.
+
+        Note
+        ----
+        The extent is NOT flipped. This is because the extent is defined as always
+        being sorted.
+        """
         data = np.flip(self.data, axis=0)
-        extent = self.extent.xflip()
-        return Image(data, extent=extent, scale=self.scale, metadata=self.metadata)
+        return Image(data, extent=self.extent, scale=self.scale, metadata=self.metadata)
 
     def yflip(self):
-        """Flip image data along y-axis."""
+        """Flip image data along y-axis.
+
+        Note
+        ----
+        The extent is NOT flipped. This is because the extent is defined as always
+        being sorted.
+        """
         data = np.flip(self.data, axis=1)
-        extent = self.extent.yflip()
-        return Image(data, extent=extent, scale=self.scale, metadata=self.metadata)
+        return Image(data, extent=self.extent, scale=self.scale, metadata=self.metadata)
 
     @property
     def extent_imshow(self):
@@ -478,16 +446,82 @@ class Image:
         gridpoints represent the center of the pixels."""
         return _correct_imshow_extent(self.extent, self.shape)
 
+    def copy(self):
+        """Return a copy of the image."""
+        return Image(
+            self.data,
+            extent=self.extent,
+            scale=self.scale,
+            metadata=deepcopy(self.metadata),
+        )
+
     @classmethod
     def test_image(cls):
         """Create a test image."""
         n_x, n_y = 129, 129
-        extent = (-10, 10, 0, 15)
+        extent = (-30, 30, 0, 40)
         x, y = np.meshgrid(
             np.linspace(-1, 1, n_x), np.linspace(-1, 1, n_y), indexing="ij"
         )
         data = np.sin(2 * np.pi * x) * np.cos(2 * np.pi * y) * (x**2)
         return cls(data, extent=extent)
+
+    def __add__(self, other):
+        """Add two images together."""
+        if isinstance(other, (int, float, np.number)):
+            data = self.data + other
+            return Image(
+                data, extent=self.extent, scale=self.scale, metadata=self.metadata
+            )
+
+        if isinstance(other, Image):
+            assert all([e1 == e2 for e1, e2 in zip(self.extent, other.extent)])
+            assert self.scale == other.scale
+            data = self.data + other.data
+            return Image(
+                data, extent=self.extent, scale=self.scale, metadata=self.metadata
+            )
+
+        other = np.array(other)
+        data = self.data + other
+        return Image(data, extent=self.extent, scale=self.scale, metadata=self.metadata)
+
+    def __mul__(self, other):
+        """Multiply image."""
+        if isinstance(other, Image):
+            other = other.data
+
+        data = self.data * other
+        return Image(data, extent=self.extent, scale=self.scale, metadata=self.metadata)
+
+    def __rmul__(self, other):
+        """Multiply image."""
+        return self.__mul__(other)
+
+    def __truediv__(self, other):
+        """Divide image."""
+        if isinstance(other, Image):
+            other = other.data
+
+        data = self.data / other
+        return Image(data, extent=self.extent, scale=self.scale, metadata=self.metadata)
+
+    def __sub__(self, other):
+        """Subtract two images."""
+        return self + (other * -1)
+
+    def __eq__(self, other):
+        """Check if two images are equal."""
+        if not isinstance(other, Image):
+            return False
+
+        if self.scale != other.scale:
+            return False
+
+        if self.extent != other.extent:
+            return False
+
+        return np.allclose(self.data, other.data)
 
 
 def _correct_imshow_extent(extent, shape):
@@ -606,6 +640,7 @@ def save_dict_to_hdf5(hdf5_file, data_dict, parent_group="/"):
     parent_group : h5py.Group
         Current group path in HDF5 file (default is root "/").
     """
+    data_dict = deepcopy(data_dict)
     data_dict = _lists_to_numbered_dict(data_dict)
     for key, value in data_dict.items():
         group_path = f"{parent_group}/{key}"

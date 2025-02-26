@@ -16,14 +16,20 @@ image_loaded = Image.load("image.hdf5")
 
 # Resample and window image
 image_resampled = image_loaded.resample(
-    shape=(16, 16), extent=(-10, -2, 0, 10), method="nearest"
+    shape=(8, 8), extent=(-10, -2, 0, 10), method="nearest"
 )
 
+n_x, n_y = image_resampled.shape
+image_extent_in_pixels = image_resampled.set_extent(Extent(0, n_x - 1, 0, n_y - 1))
+
 # Plot the images
-fig, axes = plt.subplots(1, 4)
-axes[0].imshow(image.data.T, extent=image.extent)
-axes[1].imshow(image_sliced.data.T, extent=image_sliced.extent)
-axes[2].imshow(image_loaded.data.T, extent=image_loaded.extent)
-axes[3].imshow(image_resampled.data.T, extent=image_resampled.extent)
+fig, axes = plt.subplots(1, 5)
+axes[0].imshow(image.data.T, extent=image.extent_imshow)
+axes[1].imshow(image_sliced.data.T, extent=image_sliced.extent_imshow)
+axes[2].imshow(image_loaded.data.T, extent=image_loaded.extent_imshow)
+axes[3].imshow(image_resampled.data.T, extent=image_resampled.extent_imshow)
+axes[4].imshow(
+    image_extent_in_pixels.data.T, extent=image_extent_in_pixels.extent_imshow
+)
 plt.tight_layout()
 plt.show()

@@ -19,7 +19,12 @@ def fixture_extent():
 @fixture
 def fixture_metadata():
     """Produces a metadata object."""
-    return
+    return {
+        "name": "test",
+        "date": "2020-01-01",
+        "n_samples": 3,
+        "names": ["a", "b", "c"],
+    }
 
 
 @fixture
@@ -35,15 +40,8 @@ def fixture_image():
 
 
 @fixture
-def fixture_image_with_metadata():
+def fixture_image_with_metadata(fixture_image_data, fixture_extent, fixture_metadata):
     """Produces an Image object with metadata."""
     return Image(
-        data=np.random.rand(100, 100),
-        extent=(-1, 1, 0, 3),
-        metadata={
-            "name": "test",
-            "date": "2020-01-01",
-            "n_samples": 3,
-            "names": ["a", "b", "c"],
-        },
+        data=fixture_image_data, extent=fixture_extent, metadata=fixture_metadata
     )

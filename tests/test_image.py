@@ -6,6 +6,20 @@ import pytest
 from imagelib import SCALE_DB, SCALE_LINEAR, Extent, Image
 
 
+def _dict_equal(dict1, dict2):
+    for key, value1 in dict1.items():
+        value2 = dict2[key]
+        if isinstance(value1, dict):
+            if not _dict_equal(value1, value2):
+                return False
+        elif isinstance(value1, np.ndarray):
+            if not np.allclose(value1, value2):
+                return False
+        elif value1 != value2:
+            return False
+    return True
+
+
 def test_initialize_image(fixture_image_data, fixture_extent):
     """Initializes an image object."""
     image = Image(data=fixture_image_data, extent=fixture_extent)
@@ -60,9 +74,9 @@ def test_rmul_image(fixture_image):
     """Tests multiplication of an image by an image."""
     image = fixture_image * fixture_image
     assert isinstance(image, Image), "Not an Image object."
-    assert np.allclose(fixture_image.data * fixture_image.data, image.data), (
-        "Data not equal."
-    )
+    assert np.allclose(
+        fixture_image.data * fixture_image.data, image.data
+    ), "Data not equal."
 
 
 def test_add(fixture_image):
@@ -184,15 +198,83 @@ def test_match_histograms(fixture_image, transform):
     assert np.allclose(data_matched.data, fixture_image.data)
 
 
-def _dict_equal(dict1, dict2):
-    for key, value1 in dict1.items():
-        value2 = dict2[key]
-        if isinstance(value1, dict):
-            if not _dict_equal(value1, value2):
-                return False
-        elif isinstance(value1, np.ndarray):
-            if not np.allclose(value1, value2):
-                return False
-        elif value1 != value2:
-            return False
-    return True
+@pytest.mark.parametrize("key, value", [("name", "test"), ("number", 3)])
+def test_add_metadata(fixture_image, key, value):
+    """Tests appending metadata to an image."""
+    image = fixture_image.add_metadata(key=key, value=value)
+    assert key in image.metadata
+    assert image.metadata[key] == value
+
+
+def test_append_metadata(fixture_image_with_metadata):
+    """Tests appending metadata to an image."""
+    fixture_image_with_metadata.append_metadata("new_key", "new_value")
+    assert "new_key" in fixture_image_with_metadata.metadata
+    assert isinstance(fixture_image_with_metadata.metadata["new_key"], list)
+    assert fixture_image_with_metadata.metadata["new_key"][0] == "new_value"
+
+    fixture_image_with_metadata.append_metadata("new_key", "second_value")
+    assert "new_key" in fixture_image_with_metadata.metadata
+    assert len(fixture_image_with_metadata.metadata["new_key"]) == 2
+
+
+def test_grid(fixture_image):
+    """Tests the grid method."""
+    grid = fixture_image.grid
+    assert grid.shape == (fixture_image.shape[0], fixture_image.shape[1], 2)
+    assert np.min(grid[:, :, 0]) == fixture_image.extent.x0
+    assert np.max(grid[:, :, 0]) == fixture_image.extent.x1
+    assert np.min(grid[:, :, 1]) == fixture_image.extent.y0
+    assert np.max(grid[:, :, 1]) == fixture_image.extent.y1
+
+
+def test_flatgrid(fixture_image):
+    """Tests the flatgrid method."""
+    flatgrid = fixture_image.flatgrid
+    assert flatgrid.shape == (fixture_image.n_pixels, 2)
+    assert np.min(flatgrid[:, 0]) == fixture_image.extent.x0
+    assert np.max(flatgrid[:, 0]) == fixture_image.extent.x1
+    assert np.min(flatgrid[:, 1]) == fixture_image.extent.y0
+    assert np.max(flatgrid[:, 1]) == fixture_image.extent.y1
+
+
+def test_equal(fixture_image):
+    """Tests the __eq__ method."""
+    assert fixture_image == fixture_image
+    assert fixture_image == fixture_image.copy()
+    assert fixture_image != fixture_image + 1
+
+
+def test_transpose(fixture_image):
+    """Tests the transpose method."""
+    image = fixture_image.transpose()
+    assert image.shape == (fixture_image.shape[1], fixture_image.shape[0])
+    assert fixture_image.transpose().transpose() == fixture_image
+
+
+def test_xflip(fixture_image):
+    """Tests the xflip method."""
+    image = fixture_image.xflip()
+    assert np.allclose(image.data, fixture_image.data[::-1])
+    # Flipping should not change the extent
+    assert image.extent == fixture_image.extent
+    # Flipping twice should return the original image
+    assert fixture_image.xflip().xflip() == fixture_image
+
+
+def test_yflip(fixture_image):
+    """Tests the yflip method."""
+    image = fixture_image.yflip()
+    assert np.allclose(image.data, fixture_image.data[:, ::-1])
+    # Flipping should not change the extent
+    assert image.extent == fixture_image.extent
+    # Flipping twice should return the original image
+    assert fixture_image.yflip().yflip() == fixture_image
+
+
+def test_to_pixels(fixture_image):
+    """Tests the to_pixels method."""
+    image = fixture_image.to_pixels()
+    assert image.max() == 1
+    assert image.min() == 0
+    assert image.scale == SCALE_LINEAR
