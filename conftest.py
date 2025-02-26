@@ -1,7 +1,7 @@
 import numpy as np
 from pytest import fixture
 
-from imagelib import Extent, Image
+from imagelib import Extent, Image, ImageSequence
 
 
 @fixture
@@ -45,3 +45,20 @@ def fixture_image_with_metadata(fixture_image_data, fixture_extent, fixture_meta
     return Image(
         data=fixture_image_data, extent=fixture_extent, metadata=fixture_metadata
     )
+
+
+@fixture
+def fixture_list_of_images(fixture_image_data, fixture_extent):
+    """Produces a list of Image objects."""
+    list = []
+    for n in range(5):
+        fixture_image_data += np.ones(fixture_image_data.shape)
+        list.append(Image(data=fixture_image_data, extent=fixture_extent))
+
+    return list
+
+
+@fixture
+def fixture_image_sequence(fixture_list_of_images):
+    """Produces an ImageSequence object."""
+    return ImageSequence(fixture_list_of_images)

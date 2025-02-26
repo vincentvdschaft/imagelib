@@ -31,8 +31,10 @@ class Image:
             2D numpy array containing image data (n_x, n_y).
         extent : array_like
             4-element array containing the extent of the image.
-        log_compressed : bool
-            Whether the image data is log-compressed.
+        scale : int
+            The scale of the image data (SCALE_LINEAR or SCALE_DB).
+        metadata : dict
+            Additional metadata for the image.
         """
         self.extent = Extent(extent)
         self.data = data
@@ -216,6 +218,18 @@ class Image:
         data = np.where(self.data > 0, self.data, 1e-12)
         data = 20 * np.log10(data)
         scale = SCALE_DB
+
+        return Image(data, extent=self.extent, scale=scale, metadata=self.metadata)
+
+    def log_expand(self):
+        """Log-expand image data."""
+        if self.scale == SCALE_LINEAR:
+            logging.warning("Image data is already linear. Skipping.")
+            return self
+
+        data = np.power(10, self.data / 20)
+        data = np.where(self.data <= -240, 0, data)
+        scale = SCALE_LINEAR
 
         return Image(data, extent=self.extent, scale=scale, metadata=self.metadata)
 

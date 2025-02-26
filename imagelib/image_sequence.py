@@ -17,15 +17,25 @@ class ImageSequence:
         """Get the list of images."""
         return self._images
 
+    @images.setter
+    def images(self, value):
+        """Set the list of images."""
+        if isinstance(value, Image):
+            value = [value]
+        if not all(isinstance(obj, Image) for obj in value):
+            raise TypeError("All objects must be of type Image.")
+        if not all([im.extent == value[0].extent for im in value]):
+            raise ValueError("All images must have the same extent.")
+        if not all([im.scale == value[0].scale for im in value]):
+            raise ValueError(
+                "All images must have the same scale (SCALE_LINEAR or SCALE_DB)."
+            )
+        self._images = list(value)
+
     @property
     def data(self):
         """Get the data cube of all images."""
         return np.stack([im.data for im in self.images], axis=0)
-
-    @images.setter
-    def images(self, value):
-        assert all(isinstance(obj, Image) for obj in value)
-        self._images = list(value)
 
     @property
     def extent(self):
@@ -50,10 +60,15 @@ class ImageSequence:
         self.images.append(im)
 
     def save(self, directory, name):
+        """Save image sequence to disk."""
         # Remove file extension if it exists
+        suffix = Path(name).suffix
+        if suffix == "":
+            suffix = ".hdf5"
         name = str(Path(name).with_suffix(""))
         for n, im in enumerate(self.images):
-            im.save(Path(directory) / f"{name}_{str(n).zfill(5)}.hdf5")
+            save_name = f"{name}_{str(n).zfill(5)}{suffix}"
+            im.save(Path(directory) / save_name)
 
         return self
 
@@ -95,6 +110,14 @@ class ImageSequence:
         return ImageSequence([im.log_compress() for im in self.images])
 
     def normalize(self, normval=None):
+        """Normalize the image values.
+
+        Parameters
+        ----------
+        normval : float, optional
+            The value to normalize the images to. If None, the maximum value across all
+            images is used.
+        """
         if normval is None:
             normval = self.max()
         return ImageSequence([im.normalize(normval) for im in self.images])
@@ -104,25 +127,33 @@ class ImageSequence:
             [im.normalize_percentile(percentile) for im in self.images]
         )
 
-    def match_histogram(self, other):
-        return ImageSequence([im.match_histogram(other) for im in self.images])
+    def match_histogram(self, match_image):
+        """Match the histogram of the images to another image."""
+        assert isinstance(match_image, Image), "match_image must be an Image."
+        return ImageSequence([im.match_histogram(match_image) for im in self.images])
 
     def clip(self, minval=None, maxval=None):
+        """Clip the image values."""
         return ImageSequence([im.clip(minval, maxval) for im in self.images])
 
     def max(self):
+        """Get the maximum pixel value across all images."""
         return max([im.max() for im in self.images])
 
     def min(self):
+        """Get the minimum pixel value across all images."""
         return min([im.min() for im in self.images])
 
     def transpose(self):
+        """Transpose all images."""
         return ImageSequence([im.transpose() for im in self.images])
 
     def xflip(self):
+        """Flip all images in the x direction."""
         return ImageSequence([im.xflip() for im in self.images])
 
     def yflip(self):
+        """Flip all images in the y direction."""
         return ImageSequence([im.yflip() for im in self.images])
 
     def __iter__(self):

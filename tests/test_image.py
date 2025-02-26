@@ -278,3 +278,11 @@ def test_to_pixels(fixture_image):
     assert image.max() == 1
     assert image.min() == 0
     assert image.scale == SCALE_LINEAR
+
+
+def test_log_compress(fixture_image):
+    """Tests the log_compress method."""
+    image = fixture_image.normalize().log_compress()
+    assert image.scale == SCALE_DB
+    assert image.max() == 0
+    assert fixture_image.log_compress().log_expand() == fixture_image
