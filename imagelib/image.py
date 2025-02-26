@@ -458,7 +458,7 @@ class Image:
     def extent_imshow(self):
         """Returns an extent corrected for how imshow works. It ensures that the
         gridpoints represent the center of the pixels."""
-        return _correct_imshow_extent(self.extent, self.shape)
+        return correct_imshow_extent(self.extent, self.shape)
 
     def copy(self):
         """Return a copy of the image."""
@@ -538,7 +538,7 @@ class Image:
         return np.allclose(self.data, other.data)
 
 
-def _correct_imshow_extent(extent, shape):
+def correct_imshow_extent(extent, shape):
     """Corrects the extent of an image to ensure the min and max
     extent are in the centers of the outer pixels.
 
