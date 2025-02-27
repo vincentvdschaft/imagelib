@@ -5,10 +5,10 @@ description = "Module proving an image class with various image processing metho
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
-    "h5py>=3.13.0",
-    "matplotlib>=3.10.0",
-    "numpy>=2.2.3",
-    "scipy>=1.15.2",
+    "h5py>=3.1.0",
+    "matplotlib>=3.5.0",
+    "numpy>=1.9.0",
+    "scipy>=1.1.2",
 ]
 
 [dependency-groups]
