@@ -165,6 +165,18 @@ class ImageSequence:
     def __repr__(self):
         return f"ImageSequence({len(self.images)} images)"
 
+    def __add__(self, value):
+        """Add value to images."""
+        if isinstance(value, (int, float, np.scalar, np.ndarray)):
+            return ImageSequence([im + value for im in self.images])
+        raise ValueError("Invalid type for addition.")
+
+    def __sub__(self, value):
+        """Subtract value from images."""
+        if isinstance(value, (int, float, np.scalar, np.ndarray)):
+            return ImageSequence([im - value for im in self.images])
+        raise ValueError("Invalid type for subtraction.")
+
     def map(self, func):
         """Apply a function to each image in the sequence."""
         list(map(lambda im: Image.apply_fn(im, func), self.images))
