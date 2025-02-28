@@ -50,3 +50,11 @@ def test_save_png(tmpdir, fixture_image_sequence):
     """Test that the ImageSequence class can save images as PNG."""
     fixture_image_sequence.save(directory=tmpdir, name="test.png")
     assert (tmpdir / "test_00000.png").exists()
+
+
+def test_add(fixture_image_sequence):
+    """Test that the ImageSequence class can add images."""
+    subtracted = fixture_image_sequence - 5
+    im0 = fixture_image_sequence.images[0]
+    im1 = subtracted.images[0]
+    assert np.allclose(im0.data - 5, im1.data)

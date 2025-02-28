@@ -167,13 +167,13 @@ class ImageSequence:
 
     def __add__(self, value):
         """Add value to images."""
-        if isinstance(value, (int, float, np.scalar, np.ndarray)):
+        if isinstance(value, (int, float, np.number, np.ndarray)):
             return ImageSequence([im + value for im in self.images])
         raise ValueError("Invalid type for addition.")
 
     def __sub__(self, value):
         """Subtract value from images."""
-        if isinstance(value, (int, float, np.scalar, np.ndarray)):
+        if isinstance(value, (int, float, np.number, np.ndarray)):
             return ImageSequence([im - value for im in self.images])
         raise ValueError("Invalid type for subtraction.")
 
