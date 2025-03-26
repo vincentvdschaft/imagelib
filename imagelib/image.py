@@ -172,7 +172,7 @@ class Image:
             slices.append(new_slice)
 
         # Index with slices
-        data = self.data[*slices]
+        data = self.data[tuple(slices)]
         extent = [
             self.extent[0] + slices[0].start * self.pixel_w,
             self.extent[0] + (slices[0].stop - 1) * self.pixel_w,
