@@ -106,6 +106,10 @@ class ImageSequence:
 
         return ImageSequence(images)
 
+    def to_numpy(self):
+        """Convert image sequence to numpy array."""
+        return np.stack([im.data for im in self.images], axis=0)
+
     def log_compress(self):
         return ImageSequence([im.log_compress() for im in self.images])
 
@@ -155,6 +159,24 @@ class ImageSequence:
     def yflip(self):
         """Flip all images in the y direction."""
         return ImageSequence([im.yflip() for im in self.images])
+
+    def max_image(self):
+        """Construct an image where every pixel is the maximum across all images."""
+        data = self.to_numpy()
+        data = np.max(data, axis=0)
+        return Image(data, extent=self.extent, scale=self.scale)
+
+    def min_image(self):
+        """Construct an image where every pixel is the minimum across all images."""
+        data = self.to_numpy()
+        data = np.min(data, axis=0)
+        return Image(data, extent=self.extent, scale=self.scale)
+
+    def mean_image(self):
+        """Construct an image where every pixel is the mean across all images."""
+        data = self.to_numpy()
+        data = np.mean(data, axis=0)
+        return Image(data, extent=self.extent, scale=self.scale)
 
     def __iter__(self):
         return iter(self.images)
