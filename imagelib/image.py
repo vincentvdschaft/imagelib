@@ -405,6 +405,11 @@ class Image:
             metadata=self.metadata,
         )
 
+    def resize(self, factor, method="linear"):
+        """Resamples the image to a different resolution retaining the aspect ratio."""
+        new_shape = [dim * factor for dim in self.shape]
+        return self.resample(new_shape, extent=self.extent, method=method)
+
     def square_pixels(self):
         """Ensures that the pixels are square by changing the extent and resampling
         the image if necessary."""
