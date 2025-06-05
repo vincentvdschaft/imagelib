@@ -1,5 +1,7 @@
 """Extent class for storing image extents."""
 
+import numpy as np
+
 
 class Extent(tuple):
     """Wrapper class for extent data.
@@ -153,6 +155,27 @@ class Extent(tuple):
                 "Extent can only be added to a number or a 2-tuple."
             ) from e
         return Extent(x + self[0], x + self[1], y + self[2], y + self[3])
+
+    def expand(self, points):
+        """Expand the extent to include the given points.
+
+        Parameters
+        ----------
+        points : np.ndarray
+            An array of shape (N, 2) where N is the number of points.
+
+        Returns
+        -------
+        new_extent : Extent
+            A new extent that includes the given points.
+        """
+        assert isinstance(points, np.ndarray), "Points must be a numpy array."
+        points = points.reshape(-1, 2)
+        x0 = min(points[:, 0].min(), self[0])
+        x1 = max(points[:, 0].max(), self[1])
+        y0 = min(points[:, 1].min(), self[2])
+        y1 = max(points[:, 1].max(), self[3])
+        return Extent(x0, x1, y0, y1)
 
     def __sub__(self, value):
         if _is_number(value):
