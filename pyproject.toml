@@ -3,7 +3,7 @@ name = "imagelib"
 version = "0.1.0"
 description = "Module proving an image class with various image processing methods."
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.8"
 dependencies = [
     "h5py>=3.1.0",
     "matplotlib>=3.5.0",
