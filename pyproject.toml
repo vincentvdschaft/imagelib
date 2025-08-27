@@ -6,7 +6,7 @@ readme = "README.md"
 requires-python = ">=3.8"
 dependencies = [
     "h5py>=3.1.0",
-    "matplotlib>=3.5.0",
+    "matplotlib>=3.0.0",
     "numpy>=1.9.0",
     "scipy>=1.1.2",
 ]
@@ -16,4 +16,4 @@ requires = ["setuptools", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [dependency-groups]
-dev = ["pytest>=8.3.4"]
+dev = ["pytest>=8.1.1"]
