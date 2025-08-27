@@ -181,6 +181,30 @@ class Image:
         ]
         return Image(data, extent=extent, scale=self.scale, metadata=self.metadata)
 
+    def get_window(self, extent: Extent):
+        """Returns a new image that contains only the pixels in the window.
+
+        Parameters
+        ----------
+        extent : Extent
+            The extent of the window to extract (in the image units, not pixel indices).
+        """
+        extent = Extent(extent)
+
+        ind_x0 = int(
+            np.ceil((extent.x0 - self.extent.x0) / self.extent.width * self.shape[0])
+        )
+        ind_x1 = int(
+            np.floor((extent.x1 - self.extent.x0) / self.extent.width * self.shape[0])
+        )
+        ind_y0 = int(
+            np.ceil((extent.y0 - self.extent.y0) / self.extent.height * self.shape[1])
+        )
+        ind_y1 = int(
+            np.floor((extent.y1 - self.extent.y0) / self.extent.height * self.shape[1])
+        )
+        return self[ind_x0:ind_x1, ind_y0:ind_y1]
+
     @property
     def in_db(self):
         """Return whether image data is log-compressed."""

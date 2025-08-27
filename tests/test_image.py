@@ -74,9 +74,9 @@ def test_rmul_image(fixture_image):
     """Tests multiplication of an image by an image."""
     image = fixture_image * fixture_image
     assert isinstance(image, Image), "Not an Image object."
-    assert np.allclose(
-        fixture_image.data * fixture_image.data, image.data
-    ), "Data not equal."
+    assert np.allclose(fixture_image.data * fixture_image.data, image.data), (
+        "Data not equal."
+    )
 
 
 def test_add(fixture_image):
@@ -286,3 +286,8 @@ def test_log_compress(fixture_image):
     assert image.scale == SCALE_DB
     assert image.max() == 0
     assert fixture_image.log_compress().log_expand() == fixture_image
+
+
+def test_window(fixture_image):
+    """Tests the get_window method."""
+    window = fixture_image.get_window(Extent(0, 1, 0, 1))

@@ -11,3 +11,10 @@ wheels/
 
 # VSCode
 settings.json
+
+# Files
+*.hdf5
+*.h5
+*.png
+*.jpg
+*.jpeg
