@@ -3,7 +3,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from imagelib import SCALE_DB, SCALE_LINEAR, Extent, Image
+from imagelib import Extent, Image
 
 
 def _dict_equal(dict1, dict2):
@@ -26,7 +26,6 @@ def test_initialize_image(fixture_image_data, fixture_extent):
     assert np.allclose(image.data, fixture_image_data)
     assert image.extent == fixture_extent
     assert image.shape == fixture_image_data.shape
-    assert image.scale == SCALE_LINEAR
 
 
 def test_data_immutable(fixture_image):
@@ -277,13 +276,11 @@ def test_to_pixels(fixture_image):
     image = fixture_image.to_pixels()
     assert image.max() == 1
     assert image.min() == 0
-    assert image.scale == SCALE_LINEAR
 
 
 def test_log_compress(fixture_image):
     """Tests the log_compress method."""
     image = fixture_image.normalize().log_compress()
-    assert image.scale == SCALE_DB
     assert image.max() == 0
     assert fixture_image.log_compress().log_expand() == fixture_image
 

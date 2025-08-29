@@ -1,5 +1,6 @@
-import pytest
 import numpy as np
+import pytest
+
 from imagelib.image_sequence import ImageSequence
 
 
@@ -13,14 +14,6 @@ def test_initialize_image_sequence_differing_extents(fixture_list_of_images):
     """Test that the ImageSequence class can be initialized with differing extents."""
     fixture_list_of_images[0].extent = (-1, 1, 0, 3)
     fixture_list_of_images[1].extent = (-2, 2, 1, 4)
-    with pytest.raises(ValueError):
-        ImageSequence(fixture_list_of_images)
-
-
-def test_initialize_image_sequence_differing_scales(fixture_list_of_images):
-    """Test that the ImageSequence class can be initialized with differing scales."""
-    fixture_list_of_images[0].scale = "SCALE_LINEAR"
-    fixture_list_of_images[1].scale = "SCALE_DB"
     with pytest.raises(ValueError):
         ImageSequence(fixture_list_of_images)
 

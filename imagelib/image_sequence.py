@@ -3,7 +3,7 @@ from pathlib import Path
 import numpy as np
 
 from imagelib.extent import Extent
-from imagelib.image import SCALE_DB, SCALE_LINEAR, Image
+from imagelib.image import Image
 
 
 class ImageSequence:
@@ -26,10 +26,6 @@ class ImageSequence:
             raise TypeError("All objects must be of type Image.")
         if not all([im.extent == value[0].extent for im in value]):
             raise ValueError("All images must have the same extent.")
-        if not all([im.scale == value[0].scale for im in value]):
-            raise ValueError(
-                "All images must have the same scale (SCALE_LINEAR or SCALE_DB)."
-            )
         self._images = list(value)
 
     @property
@@ -41,11 +37,6 @@ class ImageSequence:
     def extent(self):
         """Get the extent."""
         return self.images[0].extent
-
-    @property
-    def scale(self):
-        """Get the scale (SCALE_LINEAR or SCALE_DB)."""
-        return self.images[0].scale
 
     def __getitem__(self, idx):
         """Get image from list."""
@@ -97,12 +88,12 @@ class ImageSequence:
         return ImageSequence(images)
 
     @staticmethod
-    def from_numpy(data, extent, scale=SCALE_LINEAR):
+    def from_numpy(data, extent):
         assert data.ndim == 3
         n_frames = data.shape[0]
         images = []
         for n in range(n_frames):
-            images.append(Image(data[n], extent=extent, scale=scale))
+            images.append(Image(data[n], extent=extent))
 
         return ImageSequence(images)
 
@@ -164,19 +155,19 @@ class ImageSequence:
         """Construct an image where every pixel is the maximum across all images."""
         data = self.to_numpy()
         data = np.max(data, axis=0)
-        return Image(data, extent=self.extent, scale=self.scale)
+        return Image(data, extent=self.extent)
 
     def min_image(self):
         """Construct an image where every pixel is the minimum across all images."""
         data = self.to_numpy()
         data = np.min(data, axis=0)
-        return Image(data, extent=self.extent, scale=self.scale)
+        return Image(data, extent=self.extent)
 
     def mean_image(self):
         """Construct an image where every pixel is the mean across all images."""
         data = self.to_numpy()
         data = np.mean(data, axis=0)
-        return Image(data, extent=self.extent, scale=self.scale)
+        return Image(data, extent=self.extent)
 
     def __iter__(self):
         return iter(self.images)
