@@ -12,9 +12,6 @@ from scipy.interpolate import RegularGridInterpolator
 
 from imagelib.extent import Extent
 
-SCALE_LINEAR = 0
-SCALE_DB = 1
-
 
 class Image:
     """Container for image data. Contains a 2D numpy array and metadata."""
@@ -22,7 +19,7 @@ class Image:
     # Required for rmul with numpy arrays
     __array_priority__ = 1000
 
-    def __init__(self, data, extent, scale=SCALE_LINEAR, metadata=None):
+    def __init__(self, data, extent, metadata=None):
         """Initialilze Image object.
 
         Parameters
@@ -31,14 +28,11 @@ class Image:
             2D numpy array containing image data (n_x, n_y).
         extent : array_like
             4-element array containing the extent of the image.
-        scale : int
-            The scale of the image data (SCALE_LINEAR or SCALE_DB).
         metadata : dict
             Additional metadata for the image.
         """
         self.extent = Extent(extent)
         self.data = data
-        self.scale = scale
 
         self._metadata = {}
         if metadata is not None:
@@ -118,31 +112,17 @@ class Image:
         """The number of pixels in the image."""
         return self.shape[0] * self.shape[1]
 
-    @property
-    def scale(self):
-        """Return whether image data is in dB or linear."""
-        return self._scale
-
-    @scale.setter
-    def scale(self, value):
-        """Set whether image data is in dB or linear."""
-        self._scale = Image._parse_scale(value)
-
-    def set_scale(self, value):
-        """Returns a copy of the image with a new scale."""
-        return Image(self.data, self.extent, scale=value, metadata=self.metadata)
-
     def set_data(self, data):
         """Returns a copy of the image with new data."""
-        return Image(data, self.extent, scale=self.scale, metadata=self.metadata)
+        return Image(data, self.extent, metadata=self.metadata)
 
     def set_extent(self, extent):
         """Returns a copy of the image with new extent."""
-        return Image(self.data, extent, scale=self.scale, metadata=self.metadata)
+        return Image(self.data, extent, metadata=self.metadata)
 
     def set_metadata(self, metadata):
         """Returns a copy of the image with new metadata."""
-        return Image(self.data, self.extent, scale=self.scale, metadata=metadata)
+        return Image(self.data, self.extent, metadata=metadata)
 
     def __getitem__(self, idx):
         if isinstance(idx, (int, slice)):
@@ -179,7 +159,7 @@ class Image:
             self.extent[2] + slices[1].start * self.pixel_h,
             self.extent[2] + (slices[1].stop - 1) * self.pixel_h,
         ]
-        return Image(data, extent=extent, scale=self.scale, metadata=self.metadata)
+        return Image(data, extent=extent, metadata=self.metadata)
 
     def get_window(self, extent: Extent):
         """Returns a new image that contains only the pixels in the window.
@@ -205,11 +185,6 @@ class Image:
         )
         return self[ind_x0:ind_x1, ind_y0:ind_y1]
 
-    @property
-    def in_db(self):
-        """Return whether image data is log-compressed."""
-        return self.scale == SCALE_DB
-
     def save(self, path, cmap="gray"):
         """Save image to HDF5 file."""
         path = Path(path)
@@ -222,7 +197,6 @@ class Image:
             path=path,
             image=self.data,
             extent=self.extent,
-            scale=self.scale,
             metadata=self.metadata,
         )
         return self
@@ -234,42 +208,39 @@ class Image:
 
     def log_compress(self):
         """Log-compress image data."""
-        if self.scale == SCALE_DB:
-            logging.warning("Image data is already log-compressed. Skipping.")
-            return self
 
         # Prevent taking the log of 0
         data = np.where(self.data > 0, self.data, 1e-12)
         data = 20 * np.log10(data)
-        scale = SCALE_DB
 
-        return Image(data, extent=self.extent, scale=scale, metadata=self.metadata)
+        return Image(data, extent=self.extent, metadata=self.metadata)
 
     def log_expand(self):
         """Log-expand image data."""
-        if self.scale == SCALE_LINEAR:
-            logging.warning("Image data is already linear. Skipping.")
-            return self
 
         data = np.power(10, self.data / 20)
         data = np.where(self.data <= -240, 0, data)
-        scale = SCALE_LINEAR
 
-        return Image(data, extent=self.extent, scale=scale, metadata=self.metadata)
+        return Image(data, extent=self.extent, metadata=self.metadata)
 
     def normalize(self, normval=None):
-        """Normalize image data to max 1 when not log-compressed or 0 when log-compressed."""
+        """Normalize image data by dividing by the max or normval."""
 
         if normval is None:
             normval = self.data.max()
 
-        data = self.data
-        if self.scale == SCALE_DB:
-            data -= normval
-        else:
-            data /= normval
+        return Image(
+            data=self.data / normval, extent=self.extent, metadata=self.metadata
+        )
 
-        return Image(data, extent=self.extent, scale=self.scale, metadata=self.metadata)
+    def normalize_db(self, normval=None):
+        """Normalize image data by adding the max or normval."""
+        if normval is None:
+            normval = self.data.max()
+
+        return Image(
+            data=self.data - normval, extent=self.extent, metadata=self.metadata
+        )
 
     def normalize_percentile(self, percentile=99):
         """Normalize image data to the given percentile value."""
@@ -351,23 +322,7 @@ class Image:
         """Match the histogram of the image to another image."""
 
         data = _match_histograms(self.data, other.data)
-        return Image(data, extent=self.extent, scale=self.scale, metadata=self.metadata)
-
-    @staticmethod
-    def _parse_scale(val):
-        """Parse scale value."""
-        if val == SCALE_DB or val == SCALE_LINEAR:
-            return val
-
-        if isinstance(val, str):
-            val = val.lower()
-            if "lin" in val:
-                return SCALE_LINEAR
-            else:
-                return SCALE_DB
-
-        val = bool(val)
-        return SCALE_DB if val else SCALE_LINEAR
+        return Image(data, extent=self.extent, metadata=self.metadata)
 
     def max(self):
         """Find the maximum value in the image data."""
@@ -380,7 +335,7 @@ class Image:
     def clip(self, minval=None, maxval=None):
         """Clip the image data to a range."""
         data = np.clip(self.data, minval, maxval)
-        return Image(data, extent=self.extent, scale=self.scale, metadata=self.metadata)
+        return Image(data, extent=self.extent, metadata=self.metadata)
 
     def apply_fn(self, fn):
         """Apply a function to the image data."""
@@ -395,13 +350,13 @@ class Image:
             old_max = self.max()
 
         data = (self.data - old_min) / (old_max - old_min) * (maxval - minval) + minval
-        return Image(data, extent=self.extent, scale=self.scale, metadata=self.metadata)
+        return Image(data, extent=self.extent, metadata=self.metadata)
 
     def to_pixels(self):
         """Converts the image to linear pixel values [0, 1]."""
-        return self.map_range(0.0, 1.0).set_scale(SCALE_LINEAR)
+        return self.map_range(0.0, 1.0)
 
-    def resample(self, shape, extent=None, method="linear"):
+    def resample(self, shape, extent=None, method="linear", fill_value=0):
         """Resample image to a new shape."""
 
         if extent is None:
@@ -413,7 +368,7 @@ class Image:
             (self.x_vals, self.y_vals),
             self.data,
             bounds_error=False,
-            fill_value=0 if self.scale == SCALE_LINEAR else -240,
+            fill_value=fill_value,
             method=method,
         )
         new_xvals = np.linspace(extent[0], extent[1], shape[0])
@@ -425,7 +380,6 @@ class Image:
         return Image(
             new_data,
             extent=extent,
-            scale=self.scale,
             metadata=self.metadata,
         )
 
@@ -459,7 +413,7 @@ class Image:
         """Transpose image data."""
         data = self.data.T
         extent = [self.extent[2], self.extent[3], self.extent[0], self.extent[1]]
-        return Image(data, extent=extent, scale=self.scale, metadata=self.metadata)
+        return Image(data, extent=extent, metadata=self.metadata)
 
     def xflip(self):
         """Flip image data along x-axis.
@@ -470,7 +424,7 @@ class Image:
         being sorted.
         """
         data = np.flip(self.data, axis=0)
-        return Image(data, extent=self.extent, scale=self.scale, metadata=self.metadata)
+        return Image(data, extent=self.extent, metadata=self.metadata)
 
     def yflip(self):
         """Flip image data along y-axis.
@@ -481,7 +435,7 @@ class Image:
         being sorted.
         """
         data = np.flip(self.data, axis=1)
-        return Image(data, extent=self.extent, scale=self.scale, metadata=self.metadata)
+        return Image(data, extent=self.extent, metadata=self.metadata)
 
     @property
     def extent_imshow(self):
@@ -494,7 +448,6 @@ class Image:
         return Image(
             self.data,
             extent=self.extent,
-            scale=self.scale,
             metadata=deepcopy(self.metadata),
         )
 
@@ -513,21 +466,16 @@ class Image:
         """Add two images together."""
         if isinstance(other, (int, float, np.number)):
             data = self.data + other
-            return Image(
-                data, extent=self.extent, scale=self.scale, metadata=self.metadata
-            )
+            return Image(data, extent=self.extent, metadata=self.metadata)
 
         if isinstance(other, Image):
             assert all([e1 == e2 for e1, e2 in zip(self.extent, other.extent)])
-            assert self.scale == other.scale
             data = self.data + other.data
-            return Image(
-                data, extent=self.extent, scale=self.scale, metadata=self.metadata
-            )
+            return Image(data, extent=self.extent, metadata=self.metadata)
 
         other = np.array(other)
         data = self.data + other
-        return Image(data, extent=self.extent, scale=self.scale, metadata=self.metadata)
+        return Image(data, extent=self.extent, metadata=self.metadata)
 
     def __mul__(self, other):
         """Multiply image."""
@@ -535,7 +483,7 @@ class Image:
             other = other.data
 
         data = self.data * other
-        return Image(data, extent=self.extent, scale=self.scale, metadata=self.metadata)
+        return Image(data, extent=self.extent, metadata=self.metadata)
 
     def __rmul__(self, other):
         """Multiply image."""
@@ -547,7 +495,7 @@ class Image:
             other = other.data
 
         data = self.data / other
-        return Image(data, extent=self.extent, scale=self.scale, metadata=self.metadata)
+        return Image(data, extent=self.extent, metadata=self.metadata)
 
     def __sub__(self, other):
         """Subtract two images."""
@@ -556,9 +504,6 @@ class Image:
     def __eq__(self, other):
         """Check if two images are equal."""
         if not isinstance(other, Image):
-            return False
-
-        if self.scale != other.scale:
             return False
 
         if self.extent != other.extent:
@@ -597,7 +542,7 @@ def correct_imshow_extent(extent, shape):
     return Extent([ext + off for ext, off in zip(extent, offset)])
 
 
-def save_hdf5_image(path, image, extent, scale=SCALE_LINEAR, metadata=None):
+def save_hdf5_image(path, image, extent, metadata=None):
     """
     Saves an image to an hdf5 file.
 
@@ -609,8 +554,6 @@ def save_hdf5_image(path, image, extent, scale=SCALE_LINEAR, metadata=None):
         The image to save.
     extent : list
         The extent of the image (x0, x1, z0, z1).
-    scale : int
-        The scale of the image (SCALE_LINEAR or SCALE_DB).
     metadata : dict
         Additional metadata to save.
     """
@@ -636,7 +579,6 @@ def save_hdf5_image(path, image, extent, scale=SCALE_LINEAR, metadata=None):
     with h5py.File(path, "w") as dataset:
         dataset.create_dataset("image", data=image)
         dataset["image"].attrs["extent"] = extent
-        dataset["image"].attrs["scale"] = "linear" if scale == SCALE_LINEAR else "dB"
         if metadata is not None:
             save_dict_to_hdf5(dataset, metadata)
 
@@ -656,18 +598,15 @@ def load_hdf5_image(path):
         The image.
     extent : np.ndarray
         The extent of the image (x0, x1, z0, z1).
-    scale : int
-        The scale of the image (SCALE_LINEAR or SCALE_DB).
     """
 
     with h5py.File(path, "r") as dataset:
         image = dataset["image"][()]
         extent = dataset["image"].attrs["extent"]
-        scale = dataset["image"].attrs["scale"]
         metadata = load_hdf5_to_dict(dataset)
         metadata.pop("image", None)
 
-    return Image(data=image, extent=extent, scale=scale, metadata=metadata)
+    return Image(data=image, extent=extent, metadata=metadata)
 
 
 def save_dict_to_hdf5(hdf5_file, data_dict, parent_group="/"):
