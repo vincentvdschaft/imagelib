@@ -185,6 +185,28 @@ class Extent(tuple):
     def __hash__(self):
         return hash(tuple(self))
 
+    @classmethod
+    def from_bbox(cls, x, y, width, height):
+        """Create an extent from a bounding box.
+
+        Parameters
+        ----------
+        x : float
+            The x-coordinate of the bottom-left corner.
+        y : float
+            The y-coordinate of the bottom-left corner.
+        width : float
+            The width of the bounding box.
+        height : float
+            The height of the bounding box.
+
+        Returns
+        -------
+        Extent
+            The created extent.
+        """
+        return cls(x, x + width, y, y + height)
+
 
 def _is_number(value):
     try:

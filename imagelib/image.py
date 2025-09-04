@@ -10,6 +10,7 @@ import matplotlib.image
 import numpy as np
 from scipy.interpolate import RegularGridInterpolator
 
+from imagelib.dynamic_range import apply_dynamic_range_curve
 from imagelib.extent import Extent
 
 
@@ -250,10 +251,7 @@ class Image:
     def __repr__(self):
         """Return string representation of Image object."""
         shape = self.shape
-        log_compressed_str = ", in dB" if self.in_db else ""
-        return (
-            f"Image(({shape[0], shape[1]}), extent={self.extent}{log_compressed_str})"
-        )
+        return f"Image(({shape[0], shape[1]}), extent={self.extent})"
 
     @property
     def metadata(self):
@@ -339,8 +337,8 @@ class Image:
 
     def apply_fn(self, fn):
         """Apply a function to the image data."""
-        self.data = fn(self.data)
-        return self
+        data = fn(self.data)
+        return Image(data, extent=self.extent, metadata=self.metadata)
 
     def map_range(self, minval, maxval, old_min=None, old_max=None):
         """Map the image data to a new range."""
@@ -461,6 +459,11 @@ class Image:
         )
         data = np.sin(2 * np.pi * x) * np.cos(2 * np.pi * y) * (x**2)
         return cls(data, extent=extent)
+
+    def apply_dynamic_range_curve(self, curve: np.ndarray):
+        """Apply a dynamic range curve to the image data."""
+        data = apply_dynamic_range_curve(curve, self.data)
+        return Image(data, extent=self.extent, metadata=self.metadata)
 
     def __add__(self, other):
         """Add two images together."""
