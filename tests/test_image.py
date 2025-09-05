@@ -4,6 +4,7 @@ import numpy as np
 import pytest
 
 from imagelib import Extent, Image
+from imagelib.image import _DIM_X, _DIM_Y
 
 
 def _dict_equal(dict1, dict2):
@@ -221,20 +222,20 @@ def test_grid(fixture_image):
     """Tests the grid method."""
     grid = fixture_image.grid
     assert grid.shape == (fixture_image.shape[0], fixture_image.shape[1], 2)
-    assert np.min(grid[:, :, 0]) == fixture_image.extent.x0
-    assert np.max(grid[:, :, 0]) == fixture_image.extent.x1
-    assert np.min(grid[:, :, 1]) == fixture_image.extent.y0
-    assert np.max(grid[:, :, 1]) == fixture_image.extent.y1
+    assert np.min(grid[:, :, _DIM_X]) == fixture_image.extent.x0
+    assert np.max(grid[:, :, _DIM_X]) == fixture_image.extent.x1
+    assert np.min(grid[:, :, _DIM_Y]) == fixture_image.extent.y0
+    assert np.max(grid[:, :, _DIM_Y]) == fixture_image.extent.y1
 
 
 def test_flatgrid(fixture_image):
     """Tests the flatgrid method."""
     flatgrid = fixture_image.flatgrid
     assert flatgrid.shape == (fixture_image.n_pixels, 2)
-    assert np.min(flatgrid[:, 0]) == fixture_image.extent.x0
-    assert np.max(flatgrid[:, 0]) == fixture_image.extent.x1
-    assert np.min(flatgrid[:, 1]) == fixture_image.extent.y0
-    assert np.max(flatgrid[:, 1]) == fixture_image.extent.y1
+    assert np.min(flatgrid[:, _DIM_X]) == fixture_image.extent.x0
+    assert np.max(flatgrid[:, _DIM_X]) == fixture_image.extent.x1
+    assert np.min(flatgrid[:, _DIM_Y]) == fixture_image.extent.y0
+    assert np.max(flatgrid[:, _DIM_Y]) == fixture_image.extent.y1
 
 
 def test_equal(fixture_image):
@@ -254,7 +255,7 @@ def test_transpose(fixture_image):
 def test_xflip(fixture_image):
     """Tests the xflip method."""
     image = fixture_image.xflip()
-    assert np.allclose(image.data, fixture_image.data[::-1])
+    assert np.allclose(image.data, fixture_image.data[:, ::-1])
     # Flipping should not change the extent
     assert image.extent == fixture_image.extent
     # Flipping twice should return the original image
@@ -264,7 +265,7 @@ def test_xflip(fixture_image):
 def test_yflip(fixture_image):
     """Tests the yflip method."""
     image = fixture_image.yflip()
-    assert np.allclose(image.data, fixture_image.data[:, ::-1])
+    assert np.allclose(image.data, fixture_image.data[::-1, :])
     # Flipping should not change the extent
     assert image.extent == fixture_image.extent
     # Flipping twice should return the original image

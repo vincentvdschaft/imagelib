@@ -13,6 +13,8 @@ from scipy.interpolate import RegularGridInterpolator
 from imagelib.dynamic_range import apply_dynamic_range_curve
 from imagelib.extent import Extent
 
+_DIM_X, _DIM_Y = 1, 0
+
 
 class Image:
     """Container for image data. Contains a 2D numpy array and metadata."""
@@ -26,7 +28,7 @@ class Image:
         Parameters
         ----------
         data : array_like
-            2D numpy array containing image data (n_x, n_y).
+            2D numpy array containing image data (n_y, n_x).
         extent : array_like
             4-element array containing the extent of the image.
         metadata : dict
@@ -92,16 +94,16 @@ class Image:
     @property
     def pixel_w(self):
         """The width of a pixel in the image. Returns 0 if the image has size one in the x-direction."""
-        if self.shape[0] == 1:
+        if self.shape[_DIM_X] == 1:
             return 0.0
-        return self.extent.width / (self.shape[0] - 1)
+        return self.extent.width / (self.shape[_DIM_X] - 1)
 
     @property
     def pixel_h(self):
         """The height of a pixel in the image. Returns 0 if the image has size one in the y-direction."""
-        if self.shape[1] == 1:
+        if self.shape[_DIM_Y] == 1:
             return 0.0
-        return self.extent.height / (self.shape[1] - 1)
+        return self.extent.height / (self.shape[_DIM_Y] - 1)
 
     @property
     def pixel_size(self):
@@ -111,7 +113,7 @@ class Image:
     @property
     def n_pixels(self):
         """The number of pixels in the image."""
-        return self.shape[0] * self.shape[1]
+        return self.shape[_DIM_X] * self.shape[_DIM_Y]
 
     def set_data(self, data):
         """Returns a copy of the image with new data."""
@@ -133,7 +135,7 @@ class Image:
 
         assert isinstance(idx, tuple) and len(idx) == 2
         # Index with integers
-        if isinstance(idx[0], int) and isinstance(idx[1], int):
+        if isinstance(idx[_DIM_X], int) and isinstance(idx[_DIM_Y], int):
             return self.data[idx]
 
         slices = []
@@ -173,18 +175,26 @@ class Image:
         extent = Extent(extent)
 
         ind_x0 = int(
-            np.ceil((extent.x0 - self.extent.x0) / self.extent.width * self.shape[0])
+            np.ceil(
+                (extent.x0 - self.extent.x0) / self.extent.width * self.shape[_DIM_X]
+            )
         )
         ind_x1 = int(
-            np.floor((extent.x1 - self.extent.x0) / self.extent.width * self.shape[0])
+            np.floor(
+                (extent.x1 - self.extent.x0) / self.extent.width * self.shape[_DIM_X]
+            )
         )
         ind_y0 = int(
-            np.ceil((extent.y0 - self.extent.y0) / self.extent.height * self.shape[1])
+            np.ceil(
+                (extent.y0 - self.extent.y0) / self.extent.height * self.shape[_DIM_Y]
+            )
         )
         ind_y1 = int(
-            np.floor((extent.y1 - self.extent.y0) / self.extent.height * self.shape[1])
+            np.floor(
+                (extent.y1 - self.extent.y0) / self.extent.height * self.shape[_DIM_Y]
+            )
         )
-        return self[ind_x0:ind_x1, ind_y0:ind_y1]
+        return self[ind_y0:ind_y1, ind_x0:ind_x1]
 
     def save(self, path, cmap="gray"):
         """Save image to HDF5 file."""
@@ -230,6 +240,10 @@ class Image:
         if normval is None:
             normval = self.data.max()
 
+        if normval == 0.0:
+            print("Warning: normval is 0. Returning original image.")
+            return Image(data=self.data, extent=self.extent, metadata=self.metadata)
+
         return Image(
             data=self.data / normval, extent=self.extent, metadata=self.metadata
         )
@@ -251,7 +265,7 @@ class Image:
     def __repr__(self):
         """Return string representation of Image object."""
         shape = self.shape
-        return f"Image(({shape[0], shape[1]}), extent={self.extent})"
+        return f"Image((width {shape[_DIM_X]}, height {shape[_DIM_Y]}), extent={self.extent})"
 
     @property
     def metadata(self):
@@ -292,19 +306,19 @@ class Image:
     @property
     def x_vals(self):
         """Return x values of image."""
-        return np.linspace(self.extent[0], self.extent[1], self.shape[0])
+        return np.linspace(self.extent[0], self.extent[1], self.shape[_DIM_X])
 
     @property
     def y_vals(self):
         """Return y values of image."""
-        return np.linspace(self.extent[2], self.extent[3], self.shape[1])
+        return np.linspace(self.extent[2], self.extent[3], self.shape[_DIM_Y])
 
     @property
     def grid(self):
-        """Return grid of image of shape (n_x, n_y, 2)."""
+        """Return grid of image of shape (n_y, n_x, 2)."""
 
-        x_grid, y_grid = np.meshgrid(self.x_vals, self.y_vals, indexing="ij")
-        return np.stack([x_grid, y_grid], axis=-1)
+        y_grid, x_grid = np.meshgrid(self.y_vals, self.x_vals, indexing="ij")
+        return np.stack([y_grid, x_grid], axis=-1)
 
     @property
     def flatgrid(self):
@@ -347,7 +361,12 @@ class Image:
         if old_max is None:
             old_max = self.max()
 
-        data = (self.data - old_min) / (old_max - old_min) * (maxval - minval) + minval
+        denom = old_max - old_min
+        if denom == 0:
+            print("Warning: old_max equals old_min. Returning original image.")
+            return Image(data=self.data, extent=self.extent, metadata=self.metadata)
+
+        data = (self.data - old_min) / denom * (maxval - minval) + minval
         return Image(data, extent=self.extent, metadata=self.metadata)
 
     def to_pixels(self):
@@ -369,11 +388,11 @@ class Image:
             fill_value=fill_value,
             method=method,
         )
-        new_xvals = np.linspace(extent[0], extent[1], shape[0])
-        new_yvals = np.linspace(extent[2], extent[3], shape[1])
+        new_xvals = np.linspace(extent[0], extent[1], shape[_DIM_X])
+        new_yvals = np.linspace(extent[2], extent[3], shape[_DIM_Y])
 
-        x_grid, y_grid = np.meshgrid(new_xvals, new_yvals, indexing="ij")
-        new_data = interpolator((x_grid, y_grid))
+        y_grid, x_grid = np.meshgrid(new_yvals, new_xvals, indexing="ij")
+        new_data = interpolator((y_grid, x_grid))
 
         return Image(
             new_data,
@@ -393,19 +412,19 @@ class Image:
             return self
 
         if self.pixel_w < self.pixel_h:
-            n_x_new = self.shape[0]
+            n_x_new = self.shape[_DIM_X]
             n_y_new = int(self.extent.height / self.pixel_w)
             extent_new = self.extent.set_y1(
                 self.extent.y0 + (n_y_new - 1) * self.pixel_w
             )
         else:
             n_x_new = int(self.extent.width / self.pixel_h)
-            n_y_new = self.shape[1]
+            n_y_new = self.shape[_DIM_Y]
             extent_new = self.extent.set_x1(
                 self.extent.x0 + (n_x_new - 1) * self.pixel_h
             )
 
-        return self.resample((n_x_new, n_y_new), extent=extent_new)
+        return self.resample((n_y_new, n_x_new), extent=extent_new)
 
     def transpose(self):
         """Transpose image data."""
@@ -421,7 +440,7 @@ class Image:
         The extent is NOT flipped. This is because the extent is defined as always
         being sorted.
         """
-        data = np.flip(self.data, axis=0)
+        data = np.flip(self.data, axis=_DIM_X)
         return Image(data, extent=self.extent, metadata=self.metadata)
 
     def yflip(self):
@@ -432,7 +451,7 @@ class Image:
         The extent is NOT flipped. This is because the extent is defined as always
         being sorted.
         """
-        data = np.flip(self.data, axis=1)
+        data = np.flip(self.data, axis=_DIM_Y)
         return Image(data, extent=self.extent, metadata=self.metadata)
 
     @property
@@ -454,8 +473,8 @@ class Image:
         """Create a test image."""
         n_x, n_y = 129, 129
         extent = (-30, 30, 0, 40)
-        x, y = np.meshgrid(
-            np.linspace(-1, 1, n_x), np.linspace(-1, 1, n_y), indexing="ij"
+        y, x = np.meshgrid(
+            np.linspace(-1, 1, n_y), np.linspace(-1, 1, n_x), indexing="ij"
         )
         data = np.sin(2 * np.pi * x) * np.cos(2 * np.pi * y) * (x**2)
         return cls(data, extent=extent)
@@ -533,8 +552,8 @@ def correct_imshow_extent(extent, shape):
     """
     extent = Extent(extent).sort()
     width, height = extent.size
-    pixel_w = width / (shape[0] - 1)
-    pixel_h = height / (shape[1] - 1)
+    pixel_w = width / (shape[_DIM_X] - 1)
+    pixel_h = height / (shape[_DIM_Y] - 1)
 
     offset = (
         -pixel_w / 2,
