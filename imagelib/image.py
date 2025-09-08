@@ -44,7 +44,7 @@ class Image:
     def imshow(self, ax, *args, **kwargs):
         """Display image using matplotlib imshow."""
         extent = self.extent_imshow
-        return ax.imshow(self.data.T, extent=extent, origin="lower", *args, **kwargs)
+        return ax.imshow(self.data, extent=extent, origin="lower", *args, **kwargs)
 
     @property
     def shape(self):
@@ -157,10 +157,10 @@ class Image:
         # Index with slices
         data = self.data[tuple(slices)]
         extent = [
-            self.extent[0] + slices[0].start * self.pixel_w,
-            self.extent[0] + (slices[0].stop - 1) * self.pixel_w,
-            self.extent[2] + slices[1].start * self.pixel_h,
-            self.extent[2] + (slices[1].stop - 1) * self.pixel_h,
+            self.extent[0] + slices[_DIM_X].start * self.pixel_w,
+            self.extent[0] + (slices[_DIM_X].stop - 1) * self.pixel_w,
+            self.extent[2] + slices[_DIM_Y].start * self.pixel_h,
+            self.extent[2] + (slices[_DIM_Y].stop - 1) * self.pixel_h,
         ]
         return Image(data, extent=extent, metadata=self.metadata)
 
