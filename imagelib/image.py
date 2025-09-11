@@ -382,7 +382,7 @@ class Image:
             extent = Extent(extent)
 
         interpolator = RegularGridInterpolator(
-            (self.x_vals, self.y_vals),
+            (self.y_vals, self.x_vals),
             self.data,
             bounds_error=False,
             fill_value=fill_value,
