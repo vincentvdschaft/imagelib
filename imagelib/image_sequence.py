@@ -118,9 +118,15 @@ class ImageSequence:
         return ImageSequence([im.normalize(normval) for im in self.images])
 
     def normalize_percentile(self, percentile=99):
+        data = self.to_numpy()
+        normval = np.percentile(data, percentile)
         return ImageSequence(
-            [im.normalize_percentile(percentile) for im in self.images]
+            [im.normalize(normval) for im in self.images]
         )
+    
+    def to_pixels(self):
+        """Convert the extent of all images to pixel coordinates."""
+        return ImageSequence([im.to_pixels() for im in self.images])
 
     def match_histogram(self, match_image):
         """Match the histogram of the images to another image."""
