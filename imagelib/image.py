@@ -72,10 +72,10 @@ class Image:
         if data.shape[0] < 1 or data.shape[1] < 1:
             raise ValueError("Data must be at least size 1 in both dimensions.")
 
-        if data.shape[0] == 1 and self.extent.width != 0:
+        if data.shape[_DIM_X] == 1 and self.extent.width != 0:
             raise ValueError("Extent width must be 0.")
 
-        if data.shape[1] == 1 and self.extent.height != 0:
+        if data.shape[_DIM_Y] == 1 and self.extent.height != 0:
             raise ValueError("Extent height must be 0.")
 
         if data.ndim != 2:
@@ -317,8 +317,8 @@ class Image:
     def grid(self):
         """Return grid of image of shape (n_y, n_x, 2)."""
 
-        y_grid, x_grid = np.meshgrid(self.y_vals, self.x_vals, indexing="ij")
-        return np.stack([y_grid, x_grid], axis=-1)
+        x_grid, y_grid = np.meshgrid(self.x_vals, self.y_vals)
+        return np.stack([x_grid, y_grid], axis=-1)
 
     @property
     def flatgrid(self):
@@ -382,7 +382,7 @@ class Image:
             extent = Extent(extent)
 
         interpolator = RegularGridInterpolator(
-            (self.y_vals, self.x_vals),
+            (self.x_vals, self.y_vals),
             self.data,
             bounds_error=False,
             fill_value=fill_value,
@@ -391,8 +391,8 @@ class Image:
         new_xvals = np.linspace(extent[0], extent[1], shape[_DIM_X])
         new_yvals = np.linspace(extent[2], extent[3], shape[_DIM_Y])
 
-        y_grid, x_grid = np.meshgrid(new_yvals, new_xvals, indexing="ij")
-        new_data = interpolator((y_grid, x_grid))
+        x_grid, y_grid = np.meshgrid(new_xvals, new_yvals)
+        new_data = interpolator((x_grid, y_grid))
 
         return Image(
             new_data,
@@ -473,9 +473,7 @@ class Image:
         """Create a test image."""
         n_x, n_y = 129, 129
         extent = (-30, 30, 0, 40)
-        y, x = np.meshgrid(
-            np.linspace(-1, 1, n_y), np.linspace(-1, 1, n_x), indexing="ij"
-        )
+        x, y = np.meshgrid(np.linspace(extent[0], extent[1], n_x), np.linspace(extent[2], extent[3], n_y))
         data = np.sin(2 * np.pi * x) * np.cos(2 * np.pi * y) * (x**2)
         return cls(data, extent=extent)
 
