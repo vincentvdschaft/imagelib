@@ -1,6 +1,10 @@
+from pathlib import Path
+
+import matplotlib.image
 import numpy as np
 
 from .ndextent import Extent
+from .saving import load_hdf5_image, save_hdf5_image
 
 
 class NDImage:
@@ -195,6 +199,56 @@ class NDImage:
     # ==========================================================================
     # Functions
     # ==========================================================================
+    def save(self, path, cmap="gray"):
+        """Save image to HDF5 file."""
+        path = Path(path)
+        if path.suffix in [".png", ".jpg", ".jpeg", ".bmp"]:
+            matplotlib.image.imsave(path, self.array.T, cmap=cmap)
+            return self
+        assert path.suffix == ".hdf5", "File must be HDF5 format."
+
+        save_hdf5_image(
+            path=path,
+            array=self.array,
+            extent=self.extent,
+            metadata=self.metadata,
+        )
+        return self
+
+    @classmethod
+    def load(cls, path):
+        """Load image from HDF5 file."""
+        path = Path(path)
+        assert path.suffix == ".hdf5", "File must be HDF5 format."
+        return load_hdf5_image(path)
+
+    def get_window(self, extent: Extent):
+        """Returns a new image that contains only the pixels in the window.
+
+        Parameters
+        ----------
+        extent : Extent
+            The extent of the window to extract (in the image units, not pixel indices).
+        """
+        extent = Extent(extent)
+
+        slices = []
+
+        for dim in range(self.ndim):
+            limits = []
+            for limit in (extent.start(dim), extent.end(dim)):
+                index = int(
+                    np.ceil(
+                        (limit - self.extent.start(dim))
+                        / self.extent.dim_size(dim)
+                        * (self.shape[dim] - 1)
+                    )
+                )
+                limit = np.clip(index, 0, self.shape[dim] - 1)
+                limits.append(limit)
+            slices.append(slice(*limits))
+
+        return self[tuple(slices)]
 
 
 # ==============================================================================

@@ -86,7 +86,6 @@ class Extent(tuple):
         assert len(self) >= 4
         return self[3]
 
-    @property
     def dim_size(self, dim):
         """Returns the size of the given dimension."""
         self_sorted = self.sort()
@@ -132,22 +131,6 @@ class Extent(tuple):
     def ylims_flipped(self):
         """Returns (y1, y0) of the extent."""
         return self[3], self[2]
-
-    def set_x0(self, value):
-        """Set the x0 value of the extent."""
-        return Extent(value, self[1], self[2], self[3])
-
-    def set_x1(self, value):
-        """Set the x1 value of the extent."""
-        return Extent(self[0], value, self[2], self[3])
-
-    def set_y0(self, value):
-        """Set the y0 value of the extent"""
-        return Extent(self[0], self[1], value, self[3])
-
-    def set_y1(self, value):
-        """Set the y1 value of the extent."""
-        return Extent(self[0], self[1], self[2], value)
 
     def __mul__(self, value):
         return Extent(element * value for element in self)
