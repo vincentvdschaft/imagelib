@@ -134,14 +134,14 @@ def test_size_one_nonzero_width(shape, fixture_extent):
 @pytest.mark.parametrize("slice_x, slice_y", [(0, slice(None, None, None))])
 def test_getitem_scalar(fixture_image, slice_x, slice_y):
     """Tests slicing of an image."""
-    image = fixture_image[slice_x, slice_y]
-    assert np.allclose(image.data, fixture_image.data[slice_x, slice_y])
+    image = fixture_image[slice_y, slice_x]
+    assert np.allclose(image.data.ravel(), fixture_image.data[slice_y, slice_x].ravel())
     if isinstance(slice_x, int):
         assert image.extent.width == 0
-        assert image.shape[0] == 1
+        assert image.shape[_DIM_X] == 1
     if isinstance(slice_y, int):
         assert image.extent.height == 0
-        assert image.shape[1] == 1
+        assert image.shape[_DIM_Y] == 1
 
 
 @pytest.mark.parametrize(
@@ -222,20 +222,20 @@ def test_grid(fixture_image):
     """Tests the grid method."""
     grid = fixture_image.grid
     assert grid.shape == (fixture_image.shape[0], fixture_image.shape[1], 2)
-    assert np.min(grid[:, :, _DIM_X]) == fixture_image.extent.x0
-    assert np.max(grid[:, :, _DIM_X]) == fixture_image.extent.x1
-    assert np.min(grid[:, :, _DIM_Y]) == fixture_image.extent.y0
-    assert np.max(grid[:, :, _DIM_Y]) == fixture_image.extent.y1
+    assert np.min(grid[:, :, 0]) == fixture_image.extent.x0
+    assert np.max(grid[:, :, 0]) == fixture_image.extent.x1
+    assert np.min(grid[:, :, 1]) == fixture_image.extent.y0
+    assert np.max(grid[:, :, 1]) == fixture_image.extent.y1
 
 
 def test_flatgrid(fixture_image):
     """Tests the flatgrid method."""
     flatgrid = fixture_image.flatgrid
     assert flatgrid.shape == (fixture_image.n_pixels, 2)
-    assert np.min(flatgrid[:, _DIM_X]) == fixture_image.extent.x0
-    assert np.max(flatgrid[:, _DIM_X]) == fixture_image.extent.x1
-    assert np.min(flatgrid[:, _DIM_Y]) == fixture_image.extent.y0
-    assert np.max(flatgrid[:, _DIM_Y]) == fixture_image.extent.y1
+    assert np.min(flatgrid[:, 0]) == fixture_image.extent.x0
+    assert np.max(flatgrid[:, 0]) == fixture_image.extent.x1
+    assert np.min(flatgrid[:, 1]) == fixture_image.extent.y0
+    assert np.max(flatgrid[:, 1]) == fixture_image.extent.y1
 
 
 def test_equal(fixture_image):

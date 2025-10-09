@@ -72,10 +72,10 @@ class Image:
         if data.shape[0] < 1 or data.shape[1] < 1:
             raise ValueError("Data must be at least size 1 in both dimensions.")
 
-        if data.shape[0] == 1 and self.extent.width != 0:
+        if data.shape[_DIM_X] == 1 and self.extent.width != 0:
             raise ValueError("Extent width must be 0.")
 
-        if data.shape[1] == 1 and self.extent.height != 0:
+        if data.shape[_DIM_Y] == 1 and self.extent.height != 0:
             raise ValueError("Extent height must be 0.")
 
         if data.ndim != 2:
@@ -487,7 +487,10 @@ class Image:
         """Create a test image."""
         n_x, n_y = 129, 129
         extent = (-30, 30, 0, 40)
-        x, y = np.meshgrid(np.linspace(-1, 1, n_x), np.linspace(-1, 1, n_y))
+        x, y = np.meshgrid(
+            np.linspace(extent[0], extent[1], n_x),
+            np.linspace(extent[2], extent[3], n_y),
+        )
         data = np.sin(2 * np.pi * x) * np.cos(2 * np.pi * y) * (x**2)
         return cls(data, extent=extent)
 
