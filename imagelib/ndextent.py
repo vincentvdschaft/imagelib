@@ -104,7 +104,7 @@ class Extent(tuple):
     @property
     def height(self):
         """Returns the height of the extent."""
-        self.dim_size(1)
+        return self.dim_size(1)
 
     @property
     def aspect(self):

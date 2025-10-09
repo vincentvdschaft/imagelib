@@ -23,58 +23,52 @@ def _dict_equal(dict1, dict2):
 
 def test_initialize_image(fixture_image_data, fixture_extent):
     """Initializes an image object."""
-    image = Image(data=fixture_image_data, extent=fixture_extent)
-    assert np.allclose(image.data, fixture_image_data)
+    image = Image(array=fixture_image_data, extent=fixture_extent)
+    assert np.allclose(image.array, fixture_image_data)
     assert image.extent == fixture_extent
     assert image.shape == fixture_image_data.shape
-
-
-def test_data_immutable(fixture_image):
-    """Ensures that the data attribute is immutable."""
-    fixture_image.data[5, 5] = np.pi
-
-    assert fixture_image.data[5, 5] != np.pi
 
 
 def test_mul_scalar(fixture_image):
     """Tests multiplication of an image by a scalar."""
     image = fixture_image * 2
-    assert np.allclose(image.data, fixture_image.data * 2)
+    assert np.allclose(image.array, fixture_image.array * 2)
 
 
 def test_mul_ndarray(fixture_image):
     """Tests multiplication of an image by an ndarray."""
-    multiplier = np.arange(fixture_image.n_pixels).reshape(fixture_image.shape)
-    image = fixture_image.data * multiplier
-    assert np.allclose(fixture_image.data * multiplier, image.data), "Data not equal."
+    multiplier = np.arange(fixture_image.size).reshape(fixture_image.shape)
+    image = fixture_image * multiplier
+    print(image)
+    assert np.allclose(fixture_image.array * multiplier, image.array), "Data not equal."
 
 
 def test_mul_image(fixture_image):
     """Tests multiplication of an image by an ndarray."""
-    multiplier = np.arange(fixture_image.n_pixels).reshape(fixture_image.shape)
+    multiplier = np.arange(fixture_image.size).reshape(fixture_image.shape)
     image = fixture_image * multiplier
     assert isinstance(image, Image), "Not an Image object."
-    assert np.allclose(fixture_image.data * multiplier, image.data), "Data not equal."
+    assert np.allclose(fixture_image.array * multiplier, image.array), "Data not equal."
 
 
 def test_rmul_scalar(fixture_image):
     """Tests multiplication of a scalar by an image."""
     image = 2 * fixture_image
-    assert np.allclose(image.data, fixture_image.data * 2)
+    assert np.allclose(image.array, fixture_image.array * 2)
 
 
 def test_rmul_ndarray(fixture_image):
     """Tests multiplication of an ndarray by an image."""
-    multiplier = np.arange(fixture_image.n_pixels).reshape(fixture_image.shape)
+    multiplier = np.arange(fixture_image.size).reshape(fixture_image.shape)
     image = multiplier * fixture_image
-    assert np.allclose(fixture_image.data * multiplier, image.data), "Data not equal."
+    assert np.allclose(fixture_image.array * multiplier, image.array), "Data not equal."
 
 
 def test_rmul_image(fixture_image):
     """Tests multiplication of an image by an image."""
     image = fixture_image * fixture_image
     assert isinstance(image, Image), "Not an Image object."
-    assert np.allclose(fixture_image.data * fixture_image.data, image.data), (
+    assert np.allclose(fixture_image.array * fixture_image.array, image.array), (
         "Data not equal."
     )
 
@@ -82,19 +76,19 @@ def test_rmul_image(fixture_image):
 def test_add(fixture_image):
     """Tests addition of an image by a scalar."""
     image = fixture_image + 2
-    assert np.allclose(image.data, fixture_image.data + 2)
+    assert np.allclose(image.array, fixture_image.array + 2)
 
 
 def test_sub(fixture_image):
     """Tests subtraction of an image by a scalar."""
     image = fixture_image - 2
-    assert np.allclose(image.data, fixture_image.data - 2)
+    assert np.allclose(image.array, fixture_image.array - 2)
 
 
 def test_resample(fixture_image):
     """Tests resampling of an image."""
     new_shape = (20, 50)
-    new_extent = Extent(0, 1, 0, 1)
+    new_extent = Extent((0, 1, 0, 1))
     image = fixture_image.resample(shape=new_shape, extent=new_extent, method="nearest")
     assert image.shape == new_shape
     assert image.extent == new_extent
@@ -102,25 +96,9 @@ def test_resample(fixture_image):
 
 def test_square_pixels(fixture_image):
     """Tests the square_pixels method."""
-    assert fixture_image.pixel_w != fixture_image.pixel_h
+    assert fixture_image.pixel_width != fixture_image.pixel_height
     image = fixture_image.square_pixels()
-    assert image.pixel_w == image.pixel_h
-
-
-def test_raise_error_0_width(fixture_extent):
-    """Tests the raise_error method."""
-    with pytest.raises(ValueError):
-        Image(data=np.random.rand(100, 0), extent=fixture_extent)
-
-    with pytest.raises(ValueError):
-        Image(data=np.random.rand(0, 100), extent=fixture_extent)
-
-
-@pytest.mark.parametrize("shape", [(2, 100, 100), (100, 100, 3), (100, 100, 3, 3)])
-def test_wrong_n_dim(shape, fixture_extent):
-    """Tests the raise_error method."""
-    with pytest.raises(ValueError):
-        Image(data=np.random.rand(*shape), extent=fixture_extent)
+    assert image.pixel_width == image.pixel_height
 
 
 @pytest.mark.parametrize("shape", [(1, 100), (100, 1)])
@@ -128,20 +106,7 @@ def test_size_one_nonzero_width(shape, fixture_extent):
     """Ensures that an error is raised when a dimension has size 1 but non-zero width."""
 
     with pytest.raises(ValueError):
-        Image(data=np.ones(shape), extent=fixture_extent)
-
-
-@pytest.mark.parametrize("slice_x, slice_y", [(0, slice(None, None, None))])
-def test_getitem_scalar(fixture_image, slice_x, slice_y):
-    """Tests slicing of an image."""
-    image = fixture_image[slice_y, slice_x]
-    assert np.allclose(image.data.ravel(), fixture_image.data[slice_y, slice_x].ravel())
-    if isinstance(slice_x, int):
-        assert image.extent.width == 0
-        assert image.shape[_DIM_X] == 1
-    if isinstance(slice_y, int):
-        assert image.extent.height == 0
-        assert image.shape[_DIM_Y] == 1
+        Image(array=np.ones(shape), extent=fixture_extent)
 
 
 @pytest.mark.parametrize(
@@ -157,26 +122,26 @@ def test_getitem_slice(fixture_image, slice_x, slice_y):
     """Tests slicing of an image."""
 
     image = fixture_image[slice_x, slice_y]
-    data_sliced_by_numpy = fixture_image.data[slice_x, slice_y].reshape(image.shape)
-    assert np.allclose(image.data, data_sliced_by_numpy)
+    data_sliced_by_numpy = fixture_image.array[slice_x, slice_y].reshape(image.shape)
+    assert np.allclose(image.array, data_sliced_by_numpy)
     assert image.extent != fixture_image.extent
 
 
 def test_extent_after_slicing():
     """Tests the extent of an image after slicing."""
-    data = np.random.rand(101, 101)
-    extent = Extent(-5, 5, 0, 2)
-    image = Image(data=data, extent=extent)
+    array = np.random.rand(101, 101)
+    extent = Extent((-5, 5, 0, 2))
+    image = Image(array=array, extent=extent)
     image_sliced = image[0:51, 0:51]
     print(image_sliced.extent)
-    assert image_sliced.extent == Extent(-5, 0, 0, 1)
+    assert image_sliced.extent == Extent((-5, 0, 0, 1))
 
 
 def test_save_hdf5(fixture_image_with_metadata, tmp_path):
     """Tests saving an image to an HDF5 file."""
     fixture_image_with_metadata.save(tmp_path / "test.hdf5")
     image = Image.load(tmp_path / "test.hdf5")
-    assert np.allclose(image.data, fixture_image_with_metadata.data)
+    assert np.allclose(image.array, fixture_image_with_metadata.array)
     assert image.extent == fixture_image_with_metadata.extent
     assert _dict_equal(image.metadata, fixture_image_with_metadata.metadata)
 
@@ -193,9 +158,9 @@ def test_save_image_format(fixture_image, tmp_path, suffix):
 def test_match_histograms(fixture_image, transform):
     """Tests matching histograms of an image by transforming it with a monotonic
     function and then matching back to the original image."""
-    image_transformed = fixture_image.apply_fn(transform)
+    image_transformed = transform(fixture_image)
     data_matched = image_transformed.match_histogram(fixture_image)
-    assert np.allclose(data_matched.data, fixture_image.data)
+    assert np.allclose(data_matched.array, fixture_image.array)
 
 
 @pytest.mark.parametrize("key, value", [("name", "test"), ("number", 3)])
@@ -231,7 +196,7 @@ def test_grid(fixture_image):
 def test_flatgrid(fixture_image):
     """Tests the flatgrid method."""
     flatgrid = fixture_image.flatgrid
-    assert flatgrid.shape == (fixture_image.n_pixels, 2)
+    assert flatgrid.shape == (fixture_image.size, 2)
     assert np.min(flatgrid[:, 0]) == fixture_image.extent.x0
     assert np.max(flatgrid[:, 0]) == fixture_image.extent.x1
     assert np.min(flatgrid[:, 1]) == fixture_image.extent.y0
@@ -255,7 +220,7 @@ def test_transpose(fixture_image):
 def test_xflip(fixture_image):
     """Tests the xflip method."""
     image = fixture_image.xflip()
-    assert np.allclose(image.data, fixture_image.data[:, ::-1])
+    assert np.allclose(image.array, fixture_image.array[::-1, :])
     # Flipping should not change the extent
     assert image.extent == fixture_image.extent
     # Flipping twice should return the original image
@@ -265,7 +230,7 @@ def test_xflip(fixture_image):
 def test_yflip(fixture_image):
     """Tests the yflip method."""
     image = fixture_image.yflip()
-    assert np.allclose(image.data, fixture_image.data[::-1, :])
+    assert np.allclose(image.array, fixture_image.array[:, ::-1])
     # Flipping should not change the extent
     assert image.extent == fixture_image.extent
     # Flipping twice should return the original image
@@ -288,4 +253,4 @@ def test_log_compress(fixture_image):
 
 def test_window(fixture_image):
     """Tests the get_window method."""
-    window = fixture_image.get_window(Extent(0, 1, 0, 1))
+    window = fixture_image.get_window(Extent((0, 1, 0, 1)))

@@ -72,6 +72,11 @@ class NDImage:
     # ==========================================================================
     # Sizes and dimensions
     # ==========================================================================
+    @property
+    def size(self):
+        """Returns the total number of pixels in the image."""
+        return self.array.size
+
     def pixel_size(self, dim):
         """Returns the pixel size in the given dimension."""
         return (
@@ -121,7 +126,7 @@ class NDImage:
     @property
     def T(self):
         """Returns the transposed image."""
-        return NDImage(self.array.T, self.extent, metadata=self.metadata)
+        return self.transpose()
 
     # ==========================================================================
     # Metadata handling
@@ -202,16 +207,37 @@ class NDImage:
         new_grid = self.grid[key]
         new_array = self.array[key]
 
+        key_extended = _expand_ellipsis(key, self.ndim)
+
         new_extent_initializer = []
-        for dim in range(self.ndim):
+        for dim, key_element in enumerate(key_extended):
+            minval = np.min(new_grid[..., dim])
+            maxval = np.max(new_grid[..., dim])
+            if not isinstance(key_element, int):
+                new_extent_initializer.append(minval)
+                new_extent_initializer.append(maxval)
+
+        return NDImage(
+            new_array, Extent(new_extent_initializer).sort(), metadata=self.metadata
+        )
+
+    def _index_extent(self, key):
+        """Get the extent corresponding to the given index key."""
+        new_grid = self.grid[key]
+
+        key = _expand_ellipsis(key, self.ndim)
+
+        new_extent_initializer = []
+        for dim, key_element in enumerate(key):
+            dimension_should_dissapear = isinstance(key_element, int)
+            if dimension_should_dissapear:
+                continue
             minval = np.min(new_grid[..., dim])
             maxval = np.max(new_grid[..., dim])
             new_extent_initializer.append(minval)
             new_extent_initializer.append(maxval)
 
-        return NDImage(
-            new_array, Extent(new_extent_initializer).sort(), metadata=self.metadata
-        )
+        return Extent(new_extent_initializer).sort()
 
     # ==========================================================================
     # Functions
@@ -324,6 +350,11 @@ class NDImage:
         """
         extent = Extent(extent)
 
+        assert extent.ndim == self.ndim, (
+            "The extent must have the same number of dimensions as the image."
+            f"Got {extent.ndim} and {self.ndim}."
+        )
+
         slices = []
 
         for dim in range(self.ndim):
@@ -336,7 +367,7 @@ class NDImage:
                         * (self.shape[dim] - 1)
                     )
                 )
-                limit = np.clip(index, 0, self.shape[dim] - 1)
+                limit = np.clip(index, 0, self.shape[dim])
                 limits.append(limit)
             slices.append(slice(*limits))
 
@@ -393,6 +424,34 @@ class NDImage:
         """Normalize image data to the given percentile value."""
         normval = np.percentile(self, percentile)
         return self.normalize(normval)
+
+    def copy(self):
+        """Returns a copy of the image."""
+        return NDImage(self.array.copy(), self.extent, metadata=self.metadata.copy())
+
+    def transpose(self, *args, **kwargs):
+        """Returns a transposed copy of the image."""
+        return np.transpose(self.array, *args, **kwargs)
+
+    def max(self, **kwargs):
+        """Returns the maximum value of the image."""
+        return np.max(self.array, **kwargs)
+
+    def min(self, **kwargs):
+        """Returns the minimum value of the image."""
+        return np.min(self.array, **kwargs)
+
+    def mean(self, **kwargs):
+        """Returns the mean value of the image."""
+        return np.mean(self.array, **kwargs)
+
+    def xflip(self):
+        """Returns a copy of the image flipped in the x direction."""
+        return self[::-1, :]
+
+    def yflip(self):
+        """Returns a copy of the image flipped in the y direction."""
+        return self[:, ::-1]
 
     # ==========================================================================
     # Dunder methods
@@ -457,8 +516,8 @@ def _check_ndimage_initializers(array, extent: Extent):
         f"Got {array.ndim} and {extent.ndim}."
     )
     for dim in range(array.ndim):
-        if array.shape[dim] == 1:
-            assert extent.dim_size(dim) == 0.0, (
+        if array.shape[dim] == 1 and not extent.dim_size(dim) == 0.0:
+            raise ValueError(
                 "Dimensions with one element must have zero size in the extent"
             )
 
@@ -470,3 +529,17 @@ def correct_extent_for_imshow(extent: Extent, shape):
         new_initializer.append(extent.start(dim) - pixel_size / 2)
         new_initializer.append(extent.end(dim) + pixel_size / 2)
     return Extent(new_initializer)
+
+
+def _expand_ellipsis(index, ndim):
+    if not isinstance(index, tuple):
+        index = (index,)
+
+    if Ellipsis not in index:
+        return index + (slice(None),) * (ndim - len(index))
+
+    ellipsis_pos = index.index(Ellipsis)
+    num_missing = ndim - (len(index) - 1)  # minus the ellipsis itself
+    return (
+        index[:ellipsis_pos] + (slice(None),) * num_missing + index[ellipsis_pos + 1 :]
+    )
