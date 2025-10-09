@@ -196,7 +196,7 @@ class Image:
         )
         return self[ind_y0:ind_y1, ind_x0:ind_x1]
 
-    def save(self, path, cmap="gray"):
+    def save(self, path, cmap="gray", hashable=None):
         """Save image to HDF5 file."""
         path = Path(path)
         if path.suffix in [".png", ".jpg", ".jpeg", ".bmp"]:
@@ -209,6 +209,7 @@ class Image:
             image=self.data,
             extent=self.extent,
             metadata=self.metadata,
+            hashable=hashable,
         )
         return self
 
@@ -315,10 +316,10 @@ class Image:
 
     @property
     def grid(self):
-        """Return grid of image of shape (n_y, n_x, 2)."""
+        """Return grid of image of shape (n_x, n_y, 2)."""
 
-        y_grid, x_grid = np.meshgrid(self.y_vals, self.x_vals, indexing="ij")
-        return np.stack([y_grid, x_grid], axis=-1)
+        x_grid, y_grid = np.meshgrid(self.x_vals, self.y_vals)
+        return np.stack([x_grid, y_grid], axis=-1)
 
     @property
     def flatgrid(self):
@@ -335,6 +336,19 @@ class Image:
 
         data = _match_histograms(self.data, other.data)
         return Image(data, extent=self.extent, metadata=self.metadata)
+
+    def match_histogram_masked(self, other, mask_self=None, mask_other=None):
+        """Match the histogram of the image to another image, using only the masked regions."""
+
+        if mask_self is None:
+            mask_self = np.ones(self.data.shape, dtype=bool)
+        if mask_other is None:
+            mask_other = np.ones(other.data.shape, dtype=bool)
+
+        data = _match_histograms(self.data[mask_self], other.data[mask_other])
+        new_data = self.data.copy()
+        new_data[mask_self] = data
+        return Image(new_data, extent=self.extent, metadata=self.metadata)
 
     def max(self):
         """Find the maximum value in the image data."""
@@ -391,8 +405,8 @@ class Image:
         new_xvals = np.linspace(extent[0], extent[1], shape[_DIM_X])
         new_yvals = np.linspace(extent[2], extent[3], shape[_DIM_Y])
 
-        y_grid, x_grid = np.meshgrid(new_yvals, new_xvals, indexing="ij")
-        new_data = interpolator((y_grid, x_grid))
+        x_grid, y_grid = np.meshgrid(new_xvals, new_yvals)
+        new_data = interpolator((x_grid, y_grid))
 
         return Image(
             new_data,
@@ -473,15 +487,15 @@ class Image:
         """Create a test image."""
         n_x, n_y = 129, 129
         extent = (-30, 30, 0, 40)
-        y, x = np.meshgrid(
-            np.linspace(-1, 1, n_y), np.linspace(-1, 1, n_x), indexing="ij"
-        )
+        x, y = np.meshgrid(np.linspace(-1, 1, n_x), np.linspace(-1, 1, n_y))
         data = np.sin(2 * np.pi * x) * np.cos(2 * np.pi * y) * (x**2)
         return cls(data, extent=extent)
 
-    def apply_dynamic_range_curve(self, curve: np.ndarray):
+    def apply_dynamic_range_curve(self, input_points=None, output_points=None):
         """Apply a dynamic range curve to the image data."""
-        data = apply_dynamic_range_curve(curve, self.data)
+        data = apply_dynamic_range_curve(
+            self.data, input_points=input_points, output_points=output_points
+        )
         return Image(data, extent=self.extent, metadata=self.metadata)
 
     def __add__(self, other):
@@ -564,7 +578,7 @@ def correct_imshow_extent(extent, shape):
     return Extent([ext + off for ext, off in zip(extent, offset)])
 
 
-def save_hdf5_image(path, image, extent, metadata=None):
+def save_hdf5_image(path, image, extent, metadata=None, hashable=None):
     """
     Saves an image to an hdf5 file.
 
@@ -578,6 +592,9 @@ def save_hdf5_image(path, image, extent, metadata=None):
         The extent of the image (x0, x1, z0, z1).
     metadata : dict
         Additional metadata to save.
+    hashable : any
+        Optional data to include a hash of in the file. Note that the hash will not
+        include the image data, extent, or metadata by default.
     """
 
     extent = Extent(extent).sort()
@@ -601,8 +618,35 @@ def save_hdf5_image(path, image, extent, metadata=None):
     with h5py.File(path, "w") as dataset:
         dataset.create_dataset("image", data=image)
         dataset["image"].attrs["extent"] = extent
+        dataset["image"].attrs["hash"] = hash(hashable)
         if metadata is not None:
             save_dict_to_hdf5(dataset, metadata)
+
+
+def check_hdf5_image_hash(path, hashable):
+    """
+    Checks the hash of an image in an hdf5 file.
+
+    Parameters
+    ----------
+    path : str
+        The path to the hdf5 file.
+    hashable : any
+        The data to check the hash against.
+
+    Returns
+    -------
+    bool
+        True if the hash matches, False otherwise.
+    """
+    path = Path(path)
+    if not path.exists():
+        raise FileNotFoundError(f"File {path} does not exist.")
+
+    with h5py.File(path, "r") as dataset:
+        stored_hash = dataset["image"].attrs.get("hash", None)
+
+    return stored_hash == hash(hashable)
 
 
 def load_hdf5_image(path):

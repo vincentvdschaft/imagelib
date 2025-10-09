@@ -289,3 +289,47 @@ def test_log_compress(fixture_image):
 def test_window(fixture_image):
     """Tests the get_window method."""
     window = fixture_image.get_window(Extent(0, 1, 0, 1))
+
+
+def test_match_histogram_masked():
+    """Tests matching histograms of an image using masked regions."""
+
+    x, y = np.meshgrid(
+        np.linspace(-5, 5, 100),
+        np.linspace(-5, 5, 100),
+        indexing="xy",
+    )
+    r = np.sqrt(x**2 + y**2)
+    data1 = np.exp(-(x**2 + y**2) / 2) * np.sin(r * 3) + 5
+    data1[:, :30] = 0
+    data1[:, -30:] = 0
+    data1[:30, :] = 0
+    data1[-30:, :] = 0
+
+    data2 = x + 20
+    extent = Extent(-5, 5, -5, 5)
+
+    image1 = Image(data=data1, extent=extent).to_pixels()
+    image2 = Image(data=data2, extent=extent).to_pixels()
+    # image2 = (image2 + 0.3).normalize()
+    print(image1.data.min(), image1.data.max())
+    mask1 = data1 > 0
+
+    image_matched_masked = image1.match_histogram_masked(image2, mask_self=mask1)
+    image_matched = image1.match_histogram(image2)
+    import matplotlib.pyplot as plt
+
+    fig, axes = plt.subplots(1, 4)
+    axes[0].imshow(image1.data.T, extent=image1.extent_imshow, vmin=0, vmax=1)
+    axes[1].imshow(image2.data.T, extent=image2.extent_imshow, vmin=0, vmax=1)
+    axes[2].imshow(
+        image_matched.data.T, extent=image_matched.extent_imshow, vmin=0, vmax=1
+    )
+    axes[3].imshow(
+        image_matched_masked.data.T,
+        extent=image_matched_masked.extent_imshow,
+        vmin=0,
+        vmax=1,
+    )
+    plt.tight_layout()
+    plt.show()

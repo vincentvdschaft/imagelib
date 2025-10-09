@@ -5,7 +5,11 @@ from scipy.interpolate import PchipInterpolator
 # from imagelib import Image
 
 
-def apply_dynamic_range_curve(curve: np.ndarray, values: np.ndarray) -> np.ndarray:
+def apply_dynamic_range_curve(
+    values: np.ndarray,
+    input_points: np.ndarray = None,
+    output_points: np.ndarray = None,
+) -> np.ndarray:
     """
     Apply a dynamic range curve to values in [0, 1].
 
@@ -23,18 +27,33 @@ def apply_dynamic_range_curve(curve: np.ndarray, values: np.ndarray) -> np.ndarr
     np.ndarray
         Array of same shape as `values`, transformed by the spline and clipped to [0, 1].
     """
-    curve = np.asarray(curve, dtype=np.float32)
-    values = np.asarray(values, dtype=np.float32)
-    if curve.ndim != 1 or curve.size < 2:
-        raise ValueError("curve must be a 1D array with at least 2 points")
 
     cmin, cmax = values.min(), values.max()
+    print(f"Applying dynamic range curve to values in [{cmin}, {cmax}]")
 
-    # x-positions for the uniformly spaced control points in [0, 1]
-    x = np.linspace(cmin, cmax, num=curve.size)
+    if input_points is None:
+        assert output_points is not None
+        n_setpoints = np.array(output_points).size
+        input_points = np.linspace(cmin, cmax, num=n_setpoints)
+    if output_points is None:
+        assert input_points is not None
+        n_setpoints = np.array(input_points).size
+        output_points = np.linspace(cmin, cmax, num=n_setpoints)
+
+    input_points = np.asarray(input_points, dtype=np.float32)
+    output_points = np.asarray(output_points, dtype=np.float32)
+    print(input_points)
+    print(output_points)
+
+    if input_points.ndim != 1 or output_points.ndim != 1:
+        raise ValueError("input_points and output_points must be 1D arrays")
+    if input_points.size < 2 or output_points.size < 2:
+        raise ValueError("input_points and output_points must have at least 2 points")
+    if input_points.size != output_points.size:
+        raise ValueError("input_points and output_points must have the same size")
 
     # shape-preserving cubic spline (monotone where data are monotone)
-    spline = PchipInterpolator(x, curve, extrapolate=True)
+    spline = PchipInterpolator(input_points, output_points, extrapolate=True)
 
     # evaluate spline at the input values
     transformed = spline(values)
