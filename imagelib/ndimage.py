@@ -204,7 +204,7 @@ class NDImage:
 
     def __getitem__(self, key):
         """Slicing the image."""
-        new_grid = self.grid[key]
+        new_grid = self.grid[key + (slice(None, None, None),)]
         new_array = self.array[key]
 
         key_extended = _expand_ellipsis(key, self.ndim)
@@ -220,24 +220,6 @@ class NDImage:
         return NDImage(
             new_array, Extent(new_extent_initializer).sort(), metadata=self.metadata
         )
-
-    def _index_extent(self, key):
-        """Get the extent corresponding to the given index key."""
-        new_grid = self.grid[key]
-
-        key = _expand_ellipsis(key, self.ndim)
-
-        new_extent_initializer = []
-        for dim, key_element in enumerate(key):
-            dimension_should_dissapear = isinstance(key_element, int)
-            if dimension_should_dissapear:
-                continue
-            minval = np.min(new_grid[..., dim])
-            maxval = np.max(new_grid[..., dim])
-            new_extent_initializer.append(minval)
-            new_extent_initializer.append(maxval)
-
-        return Extent(new_extent_initializer).sort()
 
     # ==========================================================================
     # Functions

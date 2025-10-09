@@ -33,14 +33,6 @@ def save_hdf5_image(path, array, extent: Extent, metadata=None):
     if not path.parent.exists():
         path.parent.mkdir(parents=True)
 
-    if array.ndim > 2:
-        array = np.squeeze(array)
-        if array.ndim > 2:
-            raise ValueError(
-                f"Image must be 2D, but has shape {array.shape}. "
-                f"Try using np.squeeze to remove extra dimensions."
-            )
-
     with h5py.File(path, "w") as dataset:
         dataset.create_dataset("image", data=array)
         dataset["image"].attrs["extent"] = extent
