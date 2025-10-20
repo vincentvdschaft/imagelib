@@ -15,7 +15,7 @@ class NDImage:
         extent = Extent(extent).sort()
         _check_ndimage_initializers(array, extent)
         self.array = np.asarray(array)
-        self.extent = extent
+        self._extent = extent
         self._metadata = {}
         if metadata is not None:
             self.update_metadata(metadata)
@@ -23,10 +23,6 @@ class NDImage:
     @property
     def extent(self):
         return Extent(self._extent)
-
-    @extent.setter
-    def extent(self, value):
-        self._extent = Extent(value).sort()
 
     def __repr__(self):
         return f"NDImage(array={self.shape}, extent={self.extent!r})"
@@ -250,6 +246,9 @@ class NDImage:
     def with_array(self, array):
         return NDImage(array, extent=self.extent, metadata=self.metadata)
 
+    def with_extent(self, extent):
+        return NDImage(self.array, extent=extent, metadata=self.metadata)
+
     def map_range(self, new_min, new_max, old_min=None, old_max=None):
         """Map the image values to a new range [new_min, new_max]."""
         if old_min is None:
@@ -435,6 +434,29 @@ class NDImage:
         """Returns a copy of the image flipped in the y direction."""
         return self[:, ::-1]
 
+    def fft(self, axes=None):
+        """Returns the FFT of the image.
+
+        The spectrum is shifted so that the zero frequency component is in the center
+        of the spectrum.
+
+        The extent is updated to reflect the spatial frequency range."""
+        data = np.fft.fftn(self.array, axes=axes)
+
+        new_extent = list(self.extent)
+
+        for axis in axes or range(self.ndim):
+            data = np.fft.fftshift(data, axes=axis)
+            spatial_sampling_interval = self.pixel_size(axis)
+            spatial_freqs = np.fft.fftfreq(
+                self.shape[axis], d=spatial_sampling_interval
+            )
+
+            new_extent[2 * axis] = np.min(spatial_freqs)
+            new_extent[2 * axis + 1] = np.max(spatial_freqs)
+
+        return NDImage(data, extent=new_extent, metadata=self.metadata)
+
     # ==========================================================================
     # Dunder methods
     # ==========================================================================
@@ -487,6 +509,21 @@ class NDImage:
             return False
 
         return np.allclose(self.array, other.array)
+
+    @classmethod
+    def test_image(cls):
+        """Returns a test image."""
+
+        extent = Extent((-10, 0, 0, 20))
+        x_vals = np.linspace(extent.start(0), extent.end(0), 128)
+        y_vals = np.linspace(extent.start(1), extent.end(1), 256)
+        x_grid, y_grid = np.meshgrid(x_vals, y_vals, indexing="ij")
+        array = (
+            np.exp(-((x_grid + 5) ** 2 + (y_grid - 10) ** 2) / 20)
+            * np.sin(2 * np.pi * x_grid)
+            * np.cos(2 * np.pi * y_grid * 2)
+        )
+        return NDImage(array, extent=extent)
 
 
 # ==============================================================================
