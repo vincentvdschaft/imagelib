@@ -14,4 +14,5 @@ __all__ = [
     "load_hdf5_image",
     "check_hdf5_image_hash",
     "correct_extent_for_imshow",
+    "metrics",
 ]

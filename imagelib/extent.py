@@ -196,7 +196,7 @@ class Extent(tuple):
         Extent
             The created extent.
         """
-        return cls(x, x + width, y, y + height)
+        return cls((x, x + width, y, y + height))
 
 
 def _is_number(value):

@@ -403,7 +403,7 @@ class NDImage:
 
     def normalize_percentile(self, percentile=99):
         """Normalize image data to the given percentile value."""
-        normval = np.percentile(self, percentile)
+        normval = np.percentile(self.array, percentile)
         return self.normalize(normval)
 
     def copy(self):
@@ -523,6 +523,14 @@ class NDImage:
             * np.sin(2 * np.pi * x_grid)
             * np.cos(2 * np.pi * y_grid * 2)
         )
+        return NDImage(array, extent=extent)
+
+    @classmethod
+    def from_png(cls, path, extent=None):
+        """Load image from PNG file."""
+        array = np.mean(matplotlib.image.imread(path), axis=2).T  # convert to grayscale
+        if extent is None:
+            extent = Extent((0, array.shape[0] - 1, 0, array.shape[1] - 1))
         return NDImage(array, extent=extent)
 
 
