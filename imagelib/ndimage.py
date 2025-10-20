@@ -204,10 +204,10 @@ class NDImage:
 
     def __getitem__(self, key):
         """Slicing the image."""
-        new_grid = self.grid[key + (slice(None, None, None),)]
-        new_array = self.array[key]
 
         key_extended = _expand_ellipsis(key, self.ndim)
+        new_grid = self.grid[key_extended + (slice(None, None, None),)]
+        new_array = self.array[key_extended]
 
         new_extent_initializer = []
         for dim, key_element in enumerate(key_extended):

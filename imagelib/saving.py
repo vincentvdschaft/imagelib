@@ -154,3 +154,29 @@ def load_hdf5_to_dict(hdf5_file, parent_group="/"):
             data_dict[key] = item
 
     return _numbered_dicts_to_list(data_dict)
+
+
+def check_hdf5_image_hash(path, hashable):
+    """
+    Checks the hash of an image in an hdf5 file.
+
+    Parameters
+    ----------
+    path : str
+        The path to the hdf5 file.
+    hashable : any
+        The data to check the hash against.
+
+    Returns
+    -------
+    bool
+        True if the hash matches, False otherwise.
+    """
+    path = Path(path)
+    if not path.exists():
+        raise FileNotFoundError(f"File {path} does not exist.")
+
+    with h5py.File(path, "r") as dataset:
+        stored_hash = dataset["image"].attrs.get("hash", None)
+
+    return stored_hash == hash(hashable)

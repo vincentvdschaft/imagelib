@@ -5,6 +5,13 @@ from imagelib.ndextent import Extent
 from imagelib.ndimage import NDImage
 
 image = NDImage(np.random.randn(4, 5, 5), extent=(0, 3, -1, 1, 0, 1))
+print(
+    image[
+        :,
+        1,
+        ...,
+    ]
+)
 image + np.array(5)
 print(image.log_expand())
 image_normalized = image.normalize()
@@ -22,12 +29,16 @@ axes[0].imshow(
     aspect="equal",
 )
 axes[1].imshow(
-    image_square.T, origin="lower", extent=image_square.extent_imshow, aspect="equal"
+    image_square[..., 0].T,
+    origin="lower",
+    extent=image_square.extent_imshow,
+    aspect="equal",
 )
 
 plt.show()
 print(image.square_pixels())
-print(image.get_window(extent=(-0.8, 0.8, -0.8, 0.8)))
+print(image.get_window(extent=(-0.8, 0.8, -0.8, 0.8, -10, 10)))
+exit()
 print(np.square(image).metadata)
 
 exit()
