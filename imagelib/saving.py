@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING
 import h5py
 import numpy as np
 
-from .ndextent import Extent
+from .extent import Extent
 
 
 def save_hdf5_image(path, array, extent: Extent, metadata=None):

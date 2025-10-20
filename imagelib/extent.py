@@ -10,40 +10,59 @@ class Extent(tuple):
     extent return a new extent.
     """
 
-    def __new__(cls, *args, **kwargs):
-        if kwargs:
-            initializer = [kwargs["x0"], kwargs["x1"], kwargs["y0"], kwargs["y1"]]
-        elif len(args) == 4:
-            initializer = [
-                float(args[0]),
-                float(args[1]),
-                float(args[2]),
-                float(args[3]),
-            ]
-        # Reduce numpy arrays and such to list of floats
-        elif len(args) == 1:
-            initializer = [float(x) for x in args[0]]
-            assert len(initializer) == 4
-        else:
-            raise ValueError("Extent must have 4 elements.")
+    def __new__(cls, initializer):
+        initializer = [float(value) for value in initializer]
+        assert len(initializer) % 2 == 0, "Extent must have an even number of elements."
 
         return super(Extent, cls).__new__(cls, initializer)
 
+    def flip(self, dim):
+        """Flip the extent along the given dimension.
+
+        Parameters
+        ----------
+        dim : int
+            The dimension to flip. 0 for x, 1 for y, etc...
+
+        Returns
+        -------
+        Extent
+            The flipped extent.
+        """
+        initializer = list(self)
+        dim0 = dim * 2
+        dim1 = dim0 + 1
+        initializer[dim0], initializer[dim1] = initializer[dim1], initializer[dim0]
+        return Extent(initializer)
+
+    @property
+    def ndim(self):
+        return len(self) // 2
+
     def yflip(self):
         """Flip the y components of the extent."""
-        return Extent(self[0], self[1], self[3], self[2])
+        return self.flip(1)
 
     def xflip(self):
         """Flip the x components of the extent."""
-        return Extent(self[1], self[0], self[2], self[3])
+        return self.flip(0)
 
     def sort(self):
         """Sorts the extent such that x0 < x1 and y0 < y1."""
-        x0 = min(self[0], self[1])
-        x1 = max(self[0], self[1])
-        y1 = max(self[2], self[3])
-        y0 = min(self[2], self[3])
-        return Extent(x0, x1, y0, y1)
+        initializer = []
+        for val0, val1 in zip(self[::2], self[1::2]):
+            initializer.append(min(val0, val1))
+            initializer.append(max(val0, val1))
+
+        return Extent(initializer)
+
+    def start(self, dim):
+        """Returns the start value of the given dimension."""
+        return self[dim * 2]
+
+    def end(self, dim):
+        """Returns the end value of the given dimension."""
+        return self[dim * 2 + 1]
 
     @property
     def x0(self):
@@ -58,33 +77,39 @@ class Extent(tuple):
     @property
     def y0(self):
         """Returns the y0 value of the extent."""
+        assert len(self) >= 4
         return self[2]
 
     @property
     def y1(self):
         """Returns the y1 value of the extent."""
+        assert len(self) >= 4
         return self[3]
 
-    @property
-    def width(self):
-        """Returns the width of the extent."""
+    def dim_size(self, dim):
+        """Returns the size of the given dimension."""
         self_sorted = self.sort()
-        return self_sorted[1] - self_sorted[0]
-
-    @property
-    def height(self):
-        """Returns the height of the extent."""
-        self_sorted = self.sort()
-        return self_sorted[3] - self_sorted[2]
+        return self_sorted[dim * 2 + 1] - self_sorted[dim * 2]
 
     @property
     def size(self):
         """Returnss (width, height) of the extent."""
-        return self.width, self.height
+        return [self.dim_size(n) for n in range(self.ndim)]
+
+    @property
+    def width(self):
+        """Returns the width of the extent."""
+        return self.dim_size(0)
+
+    @property
+    def height(self):
+        """Returns the height of the extent."""
+        return self.dim_size(1)
 
     @property
     def aspect(self):
         """Returnss the aspect ratio (width/height)."""
+        assert self.ndim == 2
         return self.height / self.width
 
     @property
@@ -107,54 +132,20 @@ class Extent(tuple):
         """Returns (y1, y0) of the extent."""
         return self[3], self[2]
 
-    def set_x0(self, value):
-        """Set the x0 value of the extent."""
-        return Extent(value, self[1], self[2], self[3])
-
-    def set_x1(self, value):
-        """Set the x1 value of the extent."""
-        return Extent(self[0], value, self[2], self[3])
-
-    def set_y0(self, value):
-        """Set the y0 value of the extent"""
-        return Extent(self[0], self[1], value, self[3])
-
-    def set_y1(self, value):
-        """Set the y1 value of the extent."""
-        return Extent(self[0], self[1], self[2], value)
-
     def __mul__(self, value):
-        return Extent(
-            self[0] * value, self[1] * value, self[2] * value, self[3] * value
-        )
+        return Extent(element * value for element in self)
 
     def __rmul__(self, value):
         return self * value
 
     def __truediv__(self, value):
-        return Extent(
-            self[0] / value, self[1] / value, self[2] / value, self[3] / value
-        )
+        return Extent(element / value for element in self)
 
     def __floordiv__(self, value):
-        return Extent(
-            self[0] // value, self[1] // value, self[2] // value, self[3] // value
-        )
+        return Extent(element // value for element in self)
 
     def __add__(self, value):
-        if _is_number(value):
-            value = float(value)
-            return Extent(
-                self[0] + value, self[1] + value, self[2] + value, self[3] + value
-            )
-
-        try:
-            x, y = value[0], value[1]
-        except (TypeError, IndexError) as e:
-            raise ValueError(
-                "Extent can only be added to a number or a 2-tuple."
-            ) from e
-        return Extent(x + self[0], x + self[1], y + self[2], y + self[3])
+        return Extent(element + value for element in self)
 
     def expand(self, points):
         """Expand the extent to include the given points.

@@ -4,7 +4,6 @@ import numpy as np
 import pytest
 
 from imagelib import Extent, Image
-from imagelib.image import _DIM_X, _DIM_Y
 
 
 def _dict_equal(dict1, dict2):

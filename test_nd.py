@@ -1,7 +1,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 
-from imagelib.ndextent import Extent
+from imagelib.extent import Extent
 from imagelib.ndimage import NDImage
 
 image = NDImage(np.random.randn(4, 5, 5), extent=(0, 3, -1, 1, 0, 1))

@@ -5,8 +5,8 @@ import numpy as np
 from scipy.interpolate import RegularGridInterpolator
 
 from .dynamic_range import apply_dynamic_range_curve
+from .extent import Extent
 from .match_histograms import match_histograms
-from .ndextent import Extent
 from .saving import load_hdf5_image, save_hdf5_image
 
 

@@ -1,7 +1,7 @@
 import numpy as np
 from pytest import fixture
 
-from imagelib import Extent, Image, ImageSequence
+from imagelib import Extent, Image
 
 
 @fixture
@@ -61,4 +61,7 @@ def fixture_list_of_images(fixture_image_data, fixture_extent):
 @fixture
 def fixture_image_sequence(fixture_list_of_images):
     """Produces an ImageSequence object."""
-    return ImageSequence(fixture_list_of_images)
+    return Image(
+        array=np.stack(fixture_list_of_images),
+        extent=(*fixture_list_of_images[0].extent, 0, len(fixture_list_of_images)),
+    )
