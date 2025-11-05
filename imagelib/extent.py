@@ -132,6 +132,18 @@ class Extent(tuple):
         """Returns (y1, y0) of the extent."""
         return self[3], self[2]
 
+    @property
+    def zlims(self):
+        """Returns (z0, z1) of the extent."""
+        assert self.ndim >= 3
+        return self[4], self[5]
+
+    @property
+    def zlims_flipped(self):
+        """Returns (z1, z0) of the extent."""
+        assert self.ndim >= 3
+        return self[5], self[4]
+
     def __mul__(self, value):
         return Extent(element * value for element in self)
 
