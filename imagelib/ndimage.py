@@ -220,11 +220,11 @@ class NDImage:
     # ==========================================================================
     # Functions
     # ==========================================================================
-    def save(self, path, cmap="gray"):
+    def save(self, path, cmap="gray", vmin=None, vmax=None):
         """Save image to HDF5 file."""
         path = Path(path)
         if path.suffix in [".png", ".jpg", ".jpeg", ".bmp", ".tiff"]:
-            matplotlib.image.imsave(path, self.array.T, cmap=cmap)
+            matplotlib.image.imsave(path, self.array.T, cmap=cmap, vmin=vmin, vmax=vmax)
             return self
         assert path.suffix == ".hdf5", "File must be HDF5 format."
 
