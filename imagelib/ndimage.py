@@ -217,6 +217,9 @@ class NDImage:
             new_array, Extent(new_extent_initializer).sort(), metadata=self.metadata
         )
 
+    def __setitem__(self, key, value):
+        self.array[key] = value
+
     # ==========================================================================
     # Functions
     # ==========================================================================
