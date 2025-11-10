@@ -457,6 +457,20 @@ class NDImage:
 
         return NDImage(data, extent=new_extent, metadata=self.metadata)
 
+    def coordinates_to_indices(self, coordinates):
+        """Convert coordinates to pixel indices."""
+        assert coordinates.ndim == 2
+        assert coordinates.shape[1] == self.ndim
+        indices_total = []
+        for dim in range(self.ndim):
+            indices = (coordinates[:, dim] - self.extent.start(dim)) / self.pixel_size(
+                dim
+            )
+            indices_rounded = np.round(indices).astype(int)
+            indices_rounded = np.clip(indices_rounded, 0, self.shape[dim] - 1)
+            indices_total.append(indices_rounded)
+        return np.stack(indices_total, axis=-1)
+
     # ==========================================================================
     # Dunder methods
     # ==========================================================================

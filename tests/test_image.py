@@ -253,3 +253,17 @@ def test_log_compress(fixture_image):
 def test_window(fixture_image):
     """Tests the get_window method."""
     window = fixture_image.get_window(Extent((0, 1, 0, 1)))
+
+
+def test_coordinates_to_indices(fixture_image):
+    """Tests the coordinates_to_indices method."""
+    x_coords = np.array([0.0, 0.5, fixture_image.extent.x1])
+    y_coords = np.array([1.0, 1.5, fixture_image.extent.y1])
+    coordinates = np.stack((x_coords, y_coords), axis=1)
+    indices = fixture_image.coordinates_to_indices(coordinates)
+    print(indices)
+    assert indices.shape == (3, 2)
+    assert np.allclose(
+        indices[-1, :],
+        np.array([fixture_image.shape[0] - 1, fixture_image.shape[1] - 1]),
+    )
