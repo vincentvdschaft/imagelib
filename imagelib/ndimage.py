@@ -325,6 +325,11 @@ class NDImage:
         new_extent = Extent(new_extent_initializer)
         return self.resample(shape=new_shape, extent=new_extent, method="nearest")
 
+    def resample_scale(self, factor):
+        """Scale the image by a given factor."""
+        new_shape = [int(dim_size * factor) for dim_size in self.shape]
+        return self.resample(shape=new_shape, extent=self.extent, method="linear")
+
     def get_window(self, extent: Extent):
         """Returns a new image that contains only the pixels in the window.
 
