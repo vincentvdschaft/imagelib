@@ -15,6 +15,7 @@ class NDImage:
         extent = Extent(extent).sort()
         _check_ndimage_initializers(array, extent)
         self.array = np.asarray(array)
+        self.array.setflags(write=True)
         self._extent = extent
         self._metadata = {}
         if metadata is not None:
