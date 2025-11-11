@@ -144,6 +144,11 @@ class Extent(tuple):
         assert self.ndim >= 3
         return self[5], self[4]
 
+    @property
+    def origin(self):
+        """Returns the origin (x0, y0, ...) of the extent."""
+        return tuple(self.start(dim) for dim in range(self.ndim))
+
     def __mul__(self, value):
         return Extent(element * value for element in self)
 
