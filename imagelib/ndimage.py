@@ -15,6 +15,7 @@ class NDImage:
         extent = Extent(extent).sort()
         _check_ndimage_initializers(array, extent)
         self.array = np.asarray(array)
+        self.array.setflags(write=True)
         self._extent = extent
         self._metadata = {}
         if metadata is not None:
@@ -217,6 +218,9 @@ class NDImage:
             new_array, Extent(new_extent_initializer).sort(), metadata=self.metadata
         )
 
+    def __setitem__(self, key, value):
+        self.array[key] = value
+
     # ==========================================================================
     # Functions
     # ==========================================================================
@@ -320,6 +324,11 @@ class NDImage:
             )
         new_extent = Extent(new_extent_initializer)
         return self.resample(shape=new_shape, extent=new_extent, method="nearest")
+
+    def resample_scale(self, factor):
+        """Scale the image by a given factor."""
+        new_shape = [int(dim_size * factor) for dim_size in self.shape]
+        return self.resample(shape=new_shape, extent=self.extent, method="linear")
 
     def get_window(self, extent: Extent):
         """Returns a new image that contains only the pixels in the window.
@@ -456,6 +465,20 @@ class NDImage:
             new_extent[2 * axis + 1] = np.max(spatial_freqs)
 
         return NDImage(data, extent=new_extent, metadata=self.metadata)
+
+    def coordinates_to_indices(self, coordinates):
+        """Convert coordinates to pixel indices."""
+        assert coordinates.ndim == 2
+        assert coordinates.shape[1] == self.ndim
+        indices_total = []
+        for dim in range(self.ndim):
+            indices = (coordinates[:, dim] - self.extent.start(dim)) / self.pixel_size(
+                dim
+            )
+            indices_rounded = np.round(indices).astype(int)
+            indices_rounded = np.clip(indices_rounded, 0, self.shape[dim] - 1)
+            indices_total.append(indices_rounded)
+        return np.stack(indices_total, axis=-1)
 
     # ==========================================================================
     # Dunder methods
