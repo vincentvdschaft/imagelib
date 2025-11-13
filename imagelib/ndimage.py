@@ -12,13 +12,13 @@ from .saving import load_hdf5_image, save_hdf5_image
 
 class NDImage:
     def __init__(self, array, extent=None, metadata=None):
+        if extent is None:
+            extent = self._extent_from_array(array)
         extent = Extent(extent).sort()
         _check_ndimage_initializers(array, extent)
         self.array = np.asarray(array)
         self.array.setflags(write=True)
-        self._extent = (
-            extent if extent is not None else self._extent_from_array(self.array)
-        )
+        self._extent = extent
         self._metadata = {}
         if metadata is not None:
             self.update_metadata(metadata)
