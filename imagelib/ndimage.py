@@ -11,15 +11,26 @@ from .saving import load_hdf5_image, save_hdf5_image
 
 
 class NDImage:
-    def __init__(self, array, extent, metadata=None):
+    def __init__(self, array, extent=None, metadata=None):
         extent = Extent(extent).sort()
         _check_ndimage_initializers(array, extent)
         self.array = np.asarray(array)
         self.array.setflags(write=True)
-        self._extent = extent
+        self._extent = (
+            extent if extent is not None else self._extent_from_array(self.array)
+        )
         self._metadata = {}
         if metadata is not None:
             self.update_metadata(metadata)
+
+    @staticmethod
+    def _extent_from_array(array):
+        ndim = array.ndim
+        extent_initializer = []
+        for dim in range(ndim):
+            extent_initializer.append(0)
+            extent_initializer.append(array.shape[dim] - 1)
+        return Extent(extent_initializer)
 
     @property
     def extent(self):
