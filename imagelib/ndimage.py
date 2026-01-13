@@ -16,7 +16,7 @@ class NDImage:
             extent = self._extent_from_array(array)
         extent = Extent(extent).sort()
         _check_ndimage_initializers(array, extent)
-        self.array = np.asarray(array)
+        self.array = np.asarray(array).copy()
         self.array.setflags(write=True)
         self._extent = extent
         self._metadata = {}
