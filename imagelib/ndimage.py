@@ -316,6 +316,16 @@ class NDImage:
             metadata=self.metadata,
         )
 
+    def transpose(self, axes):
+        """Transpose the image."""
+        new_array = np.transpose(self.array, axes)
+        new_extent_initializer = []
+        for axis in axes:
+            new_extent_initializer.append(self.extent.start(axis))
+            new_extent_initializer.append(self.extent.end(axis))
+        new_extent = Extent(new_extent_initializer)
+        return NDImage(new_array, extent=new_extent, metadata=self.metadata)
+
     def square_pixels(self):
         nonzero_pixel_sizes = [
             size for size in filter(lambda size: size > 0, self.pixel_sizes)
@@ -429,10 +439,6 @@ class NDImage:
     def copy(self):
         """Returns a copy of the image."""
         return NDImage(self.array.copy(), self.extent, metadata=self.metadata.copy())
-
-    def transpose(self, *args, **kwargs):
-        """Returns a transposed copy of the image."""
-        return np.transpose(self.array, *args, **kwargs)
 
     def max(self, **kwargs):
         """Returns the maximum value of the image."""
