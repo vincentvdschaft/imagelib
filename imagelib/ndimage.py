@@ -134,7 +134,8 @@ class NDImage:
     @property
     def T(self):
         """Returns the transposed image."""
-        return self.transpose()
+        axes = list(reversed(range(self.ndim)))
+        return self.transpose(axes)
 
     # ==========================================================================
     # Metadata handling
