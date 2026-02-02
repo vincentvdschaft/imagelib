@@ -1,6 +1,5 @@
 from copy import deepcopy
 from pathlib import Path
-from typing import TYPE_CHECKING
 
 import h5py
 import numpy as np
@@ -89,6 +88,8 @@ def save_dict_to_hdf5(hdf5_file, data_dict, parent_group="/"):
             hdf5_file.require_group(group_path)
             save_dict_to_hdf5(hdf5_file, value, parent_group=group_path)
         else:
+            if value is None:
+                continue
             # Convert leaf items into datasets
             hdf5_file[group_path] = value
 
