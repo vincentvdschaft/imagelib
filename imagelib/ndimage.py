@@ -212,16 +212,23 @@ class NDImage:
         """Slicing the image."""
 
         key_extended = _expand_ellipsis(key, self.ndim)
-        new_grid = self.grid[key_extended + (slice(None, None, None),)]
         new_array = self.array[key_extended]
 
         new_extent_initializer = []
         for dim, key_element in enumerate(key_extended):
-            minval = np.min(new_grid[..., dim])
-            maxval = np.max(new_grid[..., dim])
-            if not isinstance(key_element, int):
-                new_extent_initializer.append(minval)
-                new_extent_initializer.append(maxval)
+            if isinstance(key_element, int):
+                continue
+            indices = range(self.shape[dim])[key_element]
+            if len(indices) == 0:
+                coord = self.extent.start(dim)
+                new_extent_initializer.extend([coord, coord])
+            else:
+                new_extent_initializer.append(
+                    self.extent.start(dim) + indices[0] * self.pixel_size(dim)
+                )
+                new_extent_initializer.append(
+                    self.extent.start(dim) + indices[-1] * self.pixel_size(dim)
+                )
 
         return NDImage(
             new_array, Extent(new_extent_initializer).sort(), metadata=self.metadata
