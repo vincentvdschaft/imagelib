@@ -124,10 +124,6 @@ class NDImage:
         return self.array.ndim
 
     @property
-    def size(self):
-        return self.array.size
-
-    @property
     def dtype(self):
         return self.array.dtype
 
