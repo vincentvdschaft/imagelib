@@ -1,3 +1,4 @@
+import warnings
 from pathlib import Path
 
 import matplotlib.image
@@ -328,7 +329,6 @@ class NDImage:
             size for size in filter(lambda size: size > 0, self.pixel_sizes)
         ]
         new_pixel_size = min(nonzero_pixel_sizes)
-        print(f"new_pixel_size = {new_pixel_size}")
 
         new_extent_initializer = []
         new_shape = []
@@ -396,6 +396,11 @@ class NDImage:
         """Log-compress image data with 20*log10(image)."""
 
         # Prevent taking the log of 0
+        mask_positive = self.array > 0
+        if np.any(~mask_positive):
+            warnings.warn(
+                "Warning: Image contains non-positive values. These will be set to a small value before log compression."
+            )
         data = np.where(self.array > 0, self.array, 1e-12)
         data = 20 * np.log10(data)
 
@@ -416,7 +421,7 @@ class NDImage:
             normval = self.array.max()
 
         if normval == 0.0:
-            print("Warning: normval is 0. Returning original image.")
+            warnings.warn("Warning: normval is 0. Returning original image.")
             return self
 
         return self / normval
