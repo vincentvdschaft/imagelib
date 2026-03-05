@@ -125,6 +125,14 @@ def test_getitem_slice(fixture_image, slice_x, slice_y):
     assert np.allclose(image.array, data_sliced_by_numpy)
     assert image.extent != fixture_image.extent
 
+    expected_extent = []
+    for dim, key in enumerate((slice_x, slice_y)):
+        if isinstance(key, int):
+            continue
+        coords = fixture_image.vals(dim)[key]
+        expected_extent.extend([coords[0], coords[-1]])
+    assert np.allclose(image.extent, Extent(expected_extent).sort())
+
 
 def test_extent_after_slicing():
     """Tests the extent of an image after slicing."""
