@@ -321,8 +321,10 @@ class NDImage:
             metadata=self.metadata,
         )
 
-    def transpose(self, axes):
+    def transpose(self, axes=None):
         """Transpose the image."""
+        if axes is None:
+            axes = list(reversed(range(self.ndim)))
         new_array = np.transpose(self.array, axes)
         new_extent_initializer = []
         for axis in axes:
