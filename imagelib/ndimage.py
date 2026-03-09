@@ -352,9 +352,15 @@ class NDImage:
         new_extent = Extent(new_extent_initializer)
         return self.resample(shape=new_shape, extent=new_extent, method="nearest")
 
-    def resample_scale(self, factor):
+    def resample_scale(self, factor, axes=None):
         """Scale the image by a given factor."""
-        new_shape = [int(dim_size * factor) for dim_size in self.shape]
+        factors = [
+            factor if (axes is None or dim in axes) else 1 for dim in range(self.ndim)
+        ]
+        new_shape = [
+            int(dim_size * factor_for_dim)
+            for dim_size, factor_for_dim in zip(self.shape, factors)
+        ]
         return self.resample(shape=new_shape, extent=self.extent, method="linear")
 
     def get_window(self, extent: Extent):
