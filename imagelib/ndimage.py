@@ -423,6 +423,10 @@ class NDImage:
 
         return self.with_array(array)
 
+    def abs(self):
+        """Returns the absolute value of the image."""
+        return self.with_array(np.abs(self.array))
+
     def normalize(self, normval=None):
         """Normalize image data by dividing by the max or normval."""
 
