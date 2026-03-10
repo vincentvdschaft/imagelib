@@ -496,7 +496,8 @@ class NDImage:
         """Computes the moving average along the given axis and normalizes the image by dividing by the moving average."""
 
         moving_avg = np.abs(self.moving_average(ax, window_size).array) + 1e-6
-        all_axes = tuple(set(range(self.ndim)) - set([ax]))
+
+        all_axes = tuple(set(range(self.ndim)) - set([ax % self.ndim]))
         moving_avg = np.mean(moving_avg, axis=all_axes)
         dummy_dim_tuple = [None] * self.ndim
         dummy_dim_tuple[ax] = slice(None)
