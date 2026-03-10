@@ -16,7 +16,7 @@ array = (
 
 
 image = Image(array)
-image_avg = image.normalize_moving_average(ax=0, window_size=32)
+image_avg = image.normalize_moving_average(ax=0, window_size=32, eps=5e-3)
 
 image.save("test.hdf5")
 print(Image.load("test.hdf5", indices=(slice(0, 5), slice(None))))
