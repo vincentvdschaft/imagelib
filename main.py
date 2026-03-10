@@ -3,17 +3,25 @@ import numpy as np
 
 from imagelib import Image
 
-size = 32
-array = np.random.rand(size, size)
+size = 64
+x, y = np.meshgrid(np.linspace(0, 1, size), np.linspace(0, 1, size), indexing="ij")
+array = (
+    np.sin(8 * np.pi * x) * np.cos(8 * np.pi * y) + 0.1 * np.random.rand(size, size)
+) * x
 
-image = (
-    Image(array).moving_average(ax=0, window_size=5).moving_average(ax=1, window_size=5)
-)
+
+image = Image(array)
+image_avg = image.normalize_moving_average(ax=0, window_size=32)
 
 image.save("test.hdf5")
 print(Image.load("test.hdf5", indices=(slice(0, 5), slice(None))))
 
-# image2 = image.resample((5, 5), extent=(5, 15, 5, 15))
-plt.imshow(image.array.T, extent=image.extent_imshow, origin="lower")
-# plt.imshow(image2.array.T, extent=image2.extent_imshow, origin="lower")
+fig, axes = plt.subplots(1, 2, figsize=(10, 5))
+axes[0].imshow(image.array.T, extent=image.extent_imshow, origin="lower")
+axes[0].set_title("Original Image")
+axes[1].imshow(image_avg.array.T, extent=image_avg.extent_imshow, origin="lower")
+axes[1].set_title("Moving Average (ax=0, window_size=32)")
+
+
+plt.tight_layout()
 plt.show()

@@ -492,6 +492,18 @@ class NDImage:
         )
         return self.with_array(smoothed)
 
+    def normalize_moving_average(self, ax, window_size):
+        """Computes the moving average along the given axis and normalizes the image by dividing by the moving average."""
+
+        moving_avg = np.abs(self.moving_average(ax, window_size).array) + 1e-6
+        all_axes = tuple(set(range(self.ndim)) - set([ax]))
+        moving_avg = np.mean(moving_avg, axis=all_axes)
+        dummy_dim_tuple = [None] * self.ndim
+        dummy_dim_tuple[ax] = slice(None)
+        moving_avg = moving_avg[tuple(dummy_dim_tuple)]
+        normalized = np.where(moving_avg > 0, self.array / moving_avg, 0)
+        return self.with_array(normalized)
+
     def coordinates_to_indices(self, coordinates):
         """Convert coordinates to pixel indices."""
         assert coordinates.ndim == 2
