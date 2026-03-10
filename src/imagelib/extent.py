@@ -222,3 +222,70 @@ def _is_number(value):
         return True
     except (ValueError, TypeError):
         return False
+
+
+def compute_extent_after_slicing(current_shape, extent: Extent, key) -> Extent:
+    """Compute the new spatial extent after applying a numpy-style index key.
+
+    Handles slices (including ``:``) , integers (dimension removal),
+    ``None`` / ``np.newaxis`` (new axis insertion), and ``Ellipsis``.
+    """
+    key = _expand_ellipsis(key, extent.ndim)
+
+    new_extent_coords = []
+    original_dim = 0
+
+    for key_element in key:
+        if key_element is None:
+            new_extent_coords.extend([0, 0])  # new axis carries no spatial meaning
+        elif isinstance(key_element, int):
+            original_dim += 1  # integer indexing removes this dimension
+        else:
+            indices = range(current_shape[original_dim])[key_element]
+            new_extent_coords.extend(
+                _extent_coords_for_selected_indices(
+                    extent.start(original_dim),
+                    extent.end(original_dim),
+                    current_shape[original_dim],
+                    indices,
+                )
+            )
+            original_dim += 1
+
+    return Extent(new_extent_coords).sort()
+
+
+def _extent_coords_for_selected_indices(dim_start, dim_end, num_pixels, indices):
+    """Return [coord_start, coord_end] for a sequence of selected pixel indices."""
+    if len(indices) == 0:
+        return [dim_start, dim_start]
+    return [
+        _index_to_coordinate(dim_start, dim_end, num_pixels, indices[0]),
+        _index_to_coordinate(dim_start, dim_end, num_pixels, indices[-1]),
+    ]
+
+
+def _expand_ellipsis(key, ndim):
+    """Expand Ellipsis to explicit slice(None) objects.
+
+    None (np.newaxis) items are preserved and do NOT count as consuming an array
+    dimension — only slices and integers consume dimensions.
+    """
+    if not isinstance(key, tuple):
+        key = (key,)
+
+    n_consuming = sum(1 for k in key if k is not None and k is not Ellipsis)
+
+    if Ellipsis not in key:
+        return key + (slice(None),) * (ndim - n_consuming)
+
+    ellipsis_pos = key.index(Ellipsis)
+    n_missing = ndim - n_consuming
+    return key[:ellipsis_pos] + (slice(None),) * n_missing + key[ellipsis_pos + 1 :]
+
+
+def _index_to_coordinate(dim_start, dim_end, num_pixels, pixel_index):
+    """Convert a pixel index to its physical coordinate (linear interpolation)."""
+    if num_pixels <= 1:
+        return dim_start
+    return dim_start + pixel_index * (dim_end - dim_start) / (num_pixels - 1)

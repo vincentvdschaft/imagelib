@@ -7,7 +7,7 @@ from scipy.interpolate import RegularGridInterpolator
 from scipy.ndimage import uniform_filter1d
 
 from .dynamic_range import apply_dynamic_range_curve
-from .extent import Extent
+from .extent import Extent, compute_extent_after_slicing
 from .match_histograms import match_histograms
 from .saving import load_hdf5_image, save_hdf5_image
 
@@ -97,7 +97,7 @@ class NDImage:
 
     @property
     def pixel_sizes(self):
-        return [self.pixel_size(dim) for dim in range(self.ndim)]
+        return compute_pixel_sizes(self.extent, self.shape)
 
     @property
     def pixel_width(self):
@@ -211,29 +211,9 @@ class NDImage:
 
     def __getitem__(self, key):
         """Slicing the image."""
-
-        key_extended = _expand_ellipsis(key, self.ndim)
-        new_array = self.array[key_extended]
-
-        new_extent_initializer = []
-        for dim, key_element in enumerate(key_extended):
-            if isinstance(key_element, int):
-                continue
-            indices = range(self.shape[dim])[key_element]
-            if len(indices) == 0:
-                coord = self.extent.start(dim)
-                new_extent_initializer.extend([coord, coord])
-            else:
-                new_extent_initializer.append(
-                    self.extent.start(dim) + indices[0] * self.pixel_size(dim)
-                )
-                new_extent_initializer.append(
-                    self.extent.start(dim) + indices[-1] * self.pixel_size(dim)
-                )
-
-        return NDImage(
-            new_array, Extent(new_extent_initializer).sort(), metadata=self.metadata
-        )
+        new_array = self.array[key]
+        new_extent = compute_extent_after_slicing(self.shape, self.extent, key)
+        return NDImage(new_array, new_extent, metadata=self.metadata)
 
     def __setitem__(self, key, value):
         self.array[key] = value
@@ -258,11 +238,11 @@ class NDImage:
         return self
 
     @classmethod
-    def load(cls, path):
+    def load(cls, path, indices=slice(None)):
         """Load image from HDF5 file."""
         path = Path(path)
         assert path.suffix == ".hdf5", "File must be HDF5 format."
-        return load_hdf5_image(path)
+        return load_hdf5_image(path, indices=indices)
 
     def with_array(self, array):
         return NDImage(array, extent=self.extent, metadata=self.metadata)
@@ -627,15 +607,9 @@ def correct_extent_for_imshow(extent: Extent, shape):
     return Extent(new_initializer)
 
 
-def _expand_ellipsis(index, ndim):
-    if not isinstance(index, tuple):
-        index = (index,)
-
-    if Ellipsis not in index:
-        return index + (slice(None),) * (ndim - len(index))
-
-    ellipsis_pos = index.index(Ellipsis)
-    num_missing = ndim - (len(index) - 1)  # minus the ellipsis itself
-    return (
-        index[:ellipsis_pos] + (slice(None),) * num_missing + index[ellipsis_pos + 1 :]
-    )
+def compute_pixel_sizes(extent: Extent, shape):
+    pixel_sizes = []
+    for dim in range(extent.ndim):
+        pixel_size = extent.dim_size(dim) / (shape[dim] - 1) if shape[dim] > 1 else 0.0
+        pixel_sizes.append(pixel_size)
+    return pixel_sizes

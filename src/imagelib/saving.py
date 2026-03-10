@@ -4,7 +4,7 @@ from pathlib import Path
 import h5py
 import numpy as np
 
-from .extent import Extent
+from .extent import Extent, compute_extent_after_slicing
 
 
 def save_hdf5_image(path, array, extent: Extent, metadata=None):
@@ -39,7 +39,7 @@ def save_hdf5_image(path, array, extent: Extent, metadata=None):
             save_dict_to_hdf5(dataset, metadata)
 
 
-def load_hdf5_image(path):
+def load_hdf5_image(path, indices=slice(None)):
     """
     Loads an image from an hdf5 file.
 
@@ -47,6 +47,8 @@ def load_hdf5_image(path):
     ----------
     path : str
         The path to the hdf5 file.
+    indices : slice
+        The indices to load from the image.
 
     Returns
     -------
@@ -57,8 +59,12 @@ def load_hdf5_image(path):
     """
 
     with h5py.File(path, "r") as dataset:
-        array = dataset["image"][()]
-        extent = dataset["image"].attrs["extent"]
+        original_shape = dataset["image"].shape
+        array = dataset["image"][indices]
+        extent = Extent(dataset["image"].attrs["extent"])
+        extent = compute_extent_after_slicing(
+            current_shape=original_shape, extent=extent, key=indices
+        )
         metadata = load_hdf5_to_dict(dataset)
         metadata.pop("image", None)
     from .ndimage import NDImage
