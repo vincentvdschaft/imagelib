@@ -4,6 +4,7 @@ from pathlib import Path
 import matplotlib.image
 import numpy as np
 from scipy.interpolate import RegularGridInterpolator
+from scipy.ndimage import uniform_filter1d
 
 from .dynamic_range import apply_dynamic_range_curve
 from .extent import Extent
@@ -503,6 +504,13 @@ class NDImage:
             new_extent[2 * axis + 1] = np.max(spatial_freqs)
 
         return NDImage(data, extent=new_extent, metadata=self.metadata)
+
+    def moving_average(self, ax, window_size):
+        """Apply a moving average filter along the given axis."""
+        smoothed = uniform_filter1d(
+            self.array, size=window_size, axis=ax, mode="constant", cval=0
+        )
+        return self.with_array(smoothed)
 
     def coordinates_to_indices(self, coordinates):
         """Convert coordinates to pixel indices."""
