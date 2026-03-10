@@ -4,7 +4,12 @@ import numpy as np
 from imagelib import Image
 
 size = 64
-x, y = np.meshgrid(np.linspace(0, 1, size), np.linspace(0, 1, size), indexing="ij")
+x, y, z = np.meshgrid(
+    np.linspace(0, 1, size),
+    np.linspace(0, 1, size),
+    np.linspace(0, 1, size),
+    indexing="ij",
+)
 array = (
     np.sin(8 * np.pi * x) * np.cos(8 * np.pi * y) + 0.1 * np.random.rand(size, size)
 ) * x
