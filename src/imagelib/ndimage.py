@@ -505,6 +505,22 @@ class NDImage:
         normalized = np.where(moving_avg > 0, self.array / moving_avg, 0)
         return self.with_array(normalized)
 
+    def sample(self, positions):
+        """Sample image values at the given spatial positions without interpolation.
+
+        Parameters
+        ----------
+        positions : np.ndarray of shape (N, D)
+            Spatial coordinates to sample. D must match the image dimensionality.
+
+        Returns
+        -------
+        np.ndarray of shape (N,)
+            Image values at the nearest pixel for each position.
+        """
+        indices = self.coordinates_to_indices(positions)
+        return self.array[tuple(indices[:, dim] for dim in range(self.ndim))]
+
     def coordinates_to_indices(self, coordinates):
         """Convert coordinates to pixel indices."""
         assert coordinates.ndim == 2
