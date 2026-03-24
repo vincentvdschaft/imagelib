@@ -395,12 +395,6 @@ class NDImage:
     def log_compress(self) -> NDImage:
         """Log-compress image data with 20*log10(image)."""
 
-        # Prevent taking the log of 0
-        mask_positive = self.array > 0
-        if np.any(~mask_positive):
-            warnings.warn(
-                "Warning: Image contains non-positive values. These will be set to a small value before log compression."
-            )
         data = np.where(self.array > 0, self.array, 1e-12)
         data = 20 * np.log10(data)
 
