@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import warnings
 from pathlib import Path
 
@@ -6,6 +8,7 @@ import numpy as np
 from scipy.interpolate import RegularGridInterpolator
 from scipy.ndimage import uniform_filter1d
 
+from .clahe import clahe
 from .dynamic_range import apply_dynamic_range_curve
 from .extent import Extent, compute_extent_after_slicing
 from .match_histograms import match_histograms
@@ -26,7 +29,7 @@ class NDImage:
             self.update_metadata(metadata)
 
     @staticmethod
-    def _extent_from_array(array):
+    def _extent_from_array(array) -> Extent:
         ndim = array.ndim
         extent_initializer = []
         for dim in range(ndim):
@@ -35,17 +38,17 @@ class NDImage:
         return Extent(extent_initializer)
 
     @property
-    def extent(self):
+    def extent(self) -> Extent:
         return Extent(self._extent)
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"NDImage(array={self.shape}, extent={self.extent!r})"
 
     # ==========================================================================
     # Numpy array interface
     # ==========================================================================
     # --- 1️⃣ Allow automatic conversion to numpy array ---
-    def __array__(self, dtype=None):
+    def __array__(self, dtype=None) -> np.ndarray:
         return np.asarray(self.array, dtype=dtype)
 
     # --- 2️⃣ Intercept numpy ufuncs like +, -, *, sin, etc. ---
@@ -83,11 +86,11 @@ class NDImage:
     # Sizes and dimensions
     # ==========================================================================
     @property
-    def size(self):
+    def size(self) -> int:
         """Returns the total number of pixels in the image."""
         return self.array.size
 
-    def pixel_size(self, dim):
+    def pixel_size(self, dim) -> float:
         """Returns the pixel size in the given dimension."""
         return (
             self.extent.dim_size(dim) / (self.shape[dim] - 1)
@@ -96,21 +99,21 @@ class NDImage:
         )
 
     @property
-    def pixel_sizes(self):
+    def pixel_sizes(self) -> np.ndarray:
         return compute_pixel_sizes(self.extent, self.shape)
 
     @property
-    def pixel_width(self):
+    def pixel_width(self) -> float:
         """Returns the pixel width."""
         return self.pixel_size(0)
 
     @property
-    def pixel_height(self):
+    def pixel_height(self) -> float:
         """Returns the pixel height."""
         return self.pixel_size(1)
 
     @property
-    def extent_imshow(self):
+    def extent_imshow(self) -> Extent:
         """Returns the extent adjusted for imshow."""
         return correct_extent_for_imshow(self.extent, self.shape)
 
@@ -118,19 +121,19 @@ class NDImage:
     # Forward properties
     # ==========================================================================
     @property
-    def shape(self):
+    def shape(self) -> tuple:
         return self.array.shape
 
     @property
-    def ndim(self):
+    def ndim(self) -> int:
         return self.array.ndim
 
     @property
-    def dtype(self):
+    def dtype(self) -> np.dtype:
         return self.array.dtype
 
     @property
-    def T(self):
+    def T(self) -> NDImage:
         """Returns the transposed image."""
         axes = list(reversed(range(self.ndim)))
         return self.transpose(axes)
@@ -140,27 +143,27 @@ class NDImage:
     # ==========================================================================
 
     @property
-    def metadata(self):
+    def metadata(self) -> dict:
         """Return metadata of image."""
         return self._metadata
 
     @metadata.setter
-    def metadata(self, value):
+    def metadata(self, value) -> None:
         """Set metadata of image."""
         assert isinstance(value, dict), "Metadata must be a dictionary."
         self._metadata = value
 
-    def add_metadata(self, key, value):
+    def add_metadata(self, key, value) -> NDImage:
         """Add metadata to image."""
         self._metadata[key] = value
         return self
 
-    def update_metadata(self, metadata):
+    def update_metadata(self, metadata) -> NDImage:
         """Update metadata of image."""
         self._metadata.update(metadata)
         return self
 
-    def append_metadata(self, key, value):
+    def append_metadata(self, key, value) -> NDImage:
         """Add metadata assuming the key is a list."""
 
         if key not in self.metadata:
@@ -171,33 +174,34 @@ class NDImage:
         self._metadata[key].append(value)
         return self
 
-    def clear_metadata(self):
+    def clear_metadata(self) -> NDImage:
         """Clear metadata of image."""
         self.metadata = {}
+        return self
 
     # ==========================================================================
     # Grids
     # ==========================================================================
-    def vals(self, dim):
+    def vals(self, dim) -> np.ndarray:
         """Returns the coordinate values along the given dimension."""
         return np.linspace(
             self.extent.start(dim), self.extent.end(dim), self.shape[dim]
         )
 
-    def x_vals(self):
+    def x_vals(self) -> np.ndarray:
         """Returns the x coordinate values."""
         return self.vals(0)
 
-    def y_vals(self):
+    def y_vals(self) -> np.ndarray:
         """Returns the y coordinate values."""
         return self.vals(1)
 
-    def z_vals(self):
+    def z_vals(self) -> np.ndarray:
         """Returns the z coordinate values."""
         return self.vals(2)
 
     @property
-    def grid(self):
+    def grid(self) -> np.ndarray:
         """Returns the coordinate grid."""
         return np.stack(
             np.meshgrid(*[self.vals(dim) for dim in range(self.ndim)], indexing="ij"),
@@ -205,23 +209,23 @@ class NDImage:
         )
 
     @property
-    def flatgrid(self):
+    def flatgrid(self) -> np.ndarray:
         """Returns the flattened coordinate grid."""
         return self.grid.reshape(-1, self.ndim)
 
-    def __getitem__(self, key):
+    def __getitem__(self, key) -> NDImage:
         """Slicing the image."""
         new_array = self.array[key]
         new_extent = compute_extent_after_slicing(self.shape, self.extent, key)
         return NDImage(new_array, new_extent, metadata=self.metadata)
 
-    def __setitem__(self, key, value):
+    def __setitem__(self, key, value) -> None:
         self.array[key] = value
 
     # ==========================================================================
     # Functions
     # ==========================================================================
-    def save(self, path, cmap="gray", vmin=None, vmax=None):
+    def save(self, path, cmap="gray", vmin=None, vmax=None) -> NDImage:
         """Save image to HDF5 file."""
         path = Path(path)
         if path.suffix in [".png", ".jpg", ".jpeg", ".bmp", ".tiff"]:
@@ -238,19 +242,19 @@ class NDImage:
         return self
 
     @classmethod
-    def load(cls, path, indices=slice(None)):
+    def load(cls, path, indices=slice(None)) -> NDImage:
         """Load image from HDF5 file."""
         path = Path(path)
         assert path.suffix == ".hdf5", "File must be HDF5 format."
         return load_hdf5_image(path, indices=indices)
 
-    def with_array(self, array):
+    def with_array(self, array) -> NDImage:
         return NDImage(array, extent=self.extent, metadata=self.metadata)
 
-    def with_extent(self, extent):
+    def with_extent(self, extent) -> NDImage:
         return NDImage(self.array, extent=extent, metadata=self.metadata)
 
-    def map_range(self, new_min, new_max, old_min=None, old_max=None):
+    def map_range(self, new_min, new_max, old_min=None, old_max=None) -> NDImage:
         """Map the image values to a new range [new_min, new_max]."""
         if old_min is None:
             old_min = np.min(self.array)
@@ -260,17 +264,17 @@ class NDImage:
         mapped = scaled * (new_max - new_min) + new_min
         return NDImage(mapped, self.extent, metadata=self.metadata)
 
-    def to_pixels(self):
+    def to_pixels(self) -> NDImage:
         """Convert the image to pixel values in the range [0, 1]."""
         return self.map_range(0, 1)
 
-    def clip(self, min=None, max=None):
+    def clip(self, min=None, max=None) -> NDImage:
         """Clip the image values to the given range."""
         return NDImage(
             np.clip(self.array, min, max), self.extent, metadata=self.metadata
         )
 
-    def resample(self, shape, extent=None, method="linear", fill_value=0):
+    def resample(self, shape, extent=None, method="linear", fill_value=0) -> NDImage:
         """Resample image to a new shape."""
 
         if extent is None:
@@ -302,7 +306,7 @@ class NDImage:
             metadata=self.metadata,
         )
 
-    def transpose(self, axes=None):
+    def transpose(self, axes=None) -> NDImage:
         """Transpose the image."""
         if axes is None:
             axes = list(reversed(range(self.ndim)))
@@ -314,7 +318,7 @@ class NDImage:
         new_extent = Extent(new_extent_initializer)
         return NDImage(new_array, extent=new_extent, metadata=self.metadata)
 
-    def square_pixels(self):
+    def square_pixels(self) -> NDImage:
         nonzero_pixel_sizes = [
             size for size in filter(lambda size: size > 0, self.pixel_sizes)
         ]
@@ -333,7 +337,7 @@ class NDImage:
         new_extent = Extent(new_extent_initializer)
         return self.resample(shape=new_shape, extent=new_extent, method="nearest")
 
-    def resample_scale(self, factor, axes=None):
+    def resample_scale(self, factor, axes=None) -> NDImage:
         """Scale the image by a given factor."""
         factors = [
             factor if (axes is None or dim in axes) else 1 for dim in range(self.ndim)
@@ -344,7 +348,7 @@ class NDImage:
         ]
         return self.resample(shape=new_shape, extent=self.extent, method="linear")
 
-    def get_window(self, extent: Extent):
+    def get_window(self, extent: Extent) -> NDImage:
         """Returns a new image that contains only the pixels in the window.
 
         Parameters
@@ -377,18 +381,18 @@ class NDImage:
 
         return self[tuple(slices)]
 
-    def match_histogram(self, other):
+    def match_histogram(self, other) -> NDImage:
         """Match the histogram of the image to another image."""
 
         array = match_histograms(self.array, other.array)
         return NDImage(array, extent=self.extent, metadata=self.metadata)
 
-    def apply_dynamic_range_curve(self, curve: np.ndarray):
+    def apply_dynamic_range_curve(self, curve: np.ndarray) -> NDImage:
         """Apply a dynamic range curve to the image data."""
         data = apply_dynamic_range_curve(curve, self.array)
         return NDImage(data, extent=self.extent, metadata=self.metadata)
 
-    def log_compress(self):
+    def log_compress(self) -> NDImage:
         """Log-compress image data with 20*log10(image)."""
 
         # Prevent taking the log of 0
@@ -402,7 +406,7 @@ class NDImage:
 
         return NDImage(data, extent=self.extent, metadata=self.metadata)
 
-    def log_expand(self):
+    def log_expand(self) -> NDImage:
         """Log-expand image data."""
 
         array = np.power(10, self.array / 20)
@@ -410,11 +414,11 @@ class NDImage:
 
         return self.with_array(array)
 
-    def abs(self):
+    def abs(self) -> NDImage:
         """Returns the absolute value of the image."""
         return self.with_array(np.abs(self.array))
 
-    def normalize(self, normval=None):
+    def normalize(self, normval=None) -> NDImage:
         """Normalize image data by dividing by the max or normval."""
 
         if normval is None:
@@ -426,43 +430,43 @@ class NDImage:
 
         return self / normval
 
-    def normalize_db(self, normval=None):
+    def normalize_db(self, normval=None) -> NDImage:
         """Normalize image data by adding the max or normval."""
         if normval is None:
             normval = self.array.max()
 
         return self - np.array(normval)
 
-    def normalize_percentile(self, percentile=99):
+    def normalize_percentile(self, percentile=99) -> NDImage:
         """Normalize image data to the given percentile value."""
         normval = np.percentile(self.array, percentile)
         return self.normalize(normval)
 
-    def copy(self):
+    def copy(self) -> NDImage:
         """Returns a copy of the image."""
         return NDImage(self.array.copy(), self.extent, metadata=self.metadata.copy())
 
-    def max(self, **kwargs):
+    def max(self, **kwargs) -> float:
         """Returns the maximum value of the image."""
         return np.max(self.array, **kwargs)
 
-    def min(self, **kwargs):
+    def min(self, **kwargs) -> float:
         """Returns the minimum value of the image."""
         return np.min(self.array, **kwargs)
 
-    def mean(self, **kwargs):
+    def mean(self, **kwargs) -> float:
         """Returns the mean value of the image."""
         return np.mean(self.array, **kwargs)
 
-    def xflip(self):
+    def xflip(self) -> NDImage:
         """Returns a copy of the image flipped in the x direction."""
         return self[::-1, :]
 
-    def yflip(self):
+    def yflip(self) -> NDImage:
         """Returns a copy of the image flipped in the y direction."""
         return self[:, ::-1]
 
-    def fft(self, axes=None):
+    def fft(self, axes=None) -> NDImage:
         """Returns the FFT of the image.
 
         The spectrum is shifted so that the zero frequency component is in the center
@@ -485,14 +489,14 @@ class NDImage:
 
         return NDImage(data, extent=new_extent, metadata=self.metadata)
 
-    def moving_average(self, ax, window_size):
+    def moving_average(self, ax, window_size) -> NDImage:
         """Apply a moving average filter along the given axis."""
         smoothed = uniform_filter1d(
             self.array, size=window_size, axis=ax, mode="constant", cval=0
         )
         return self.with_array(smoothed)
 
-    def normalize_moving_average(self, ax, window_size, eps=1e-6):
+    def normalize_moving_average(self, ax, window_size, eps=1e-6) -> NDImage:
         """Computes the moving average along the given axis and normalizes the image by dividing by the moving average."""
 
         moving_avg = np.abs(self.moving_average(ax, window_size).array) + eps
@@ -505,7 +509,7 @@ class NDImage:
         normalized = np.where(moving_avg > 0, self.array / moving_avg, 0)
         return self.with_array(normalized)
 
-    def sample(self, positions):
+    def sample(self, positions) -> np.ndarray:
         """Sample image values at the given spatial positions without interpolation.
 
         Parameters
@@ -521,7 +525,7 @@ class NDImage:
         indices = self.coordinates_to_indices(positions)
         return self.array[tuple(indices[:, dim] for dim in range(self.ndim))]
 
-    def coordinates_to_indices(self, coordinates):
+    def coordinates_to_indices(self, coordinates) -> np.ndarray:
         """Convert coordinates to pixel indices."""
         assert coordinates.ndim == 2
         assert coordinates.shape[1] == self.ndim
@@ -535,11 +539,23 @@ class NDImage:
             indices_total.append(indices_rounded)
         return np.stack(indices_total, axis=-1)
 
+    def clahe(
+        self,
+        clip_limit: float = 0.01,
+        tile_grid_size: tuple = (8, 8),
+        axes: tuple = (0, 1),
+    ) -> NDImage:
+        """Apply CLAHE to the image."""
+        if self.ndim < 2:
+            raise ValueError("CLAHE requires at least 2D images.")
+        data = clahe(self.array, clip_limit=clip_limit, tile_grid_size=tile_grid_size)
+        return NDImage(data, extent=self.extent, metadata=self.metadata)
+
     # ==========================================================================
     # Dunder methods
     # ==========================================================================
 
-    def __add__(self, other):
+    def __add__(self, other) -> NDImage:
         """Add two images together."""
         if isinstance(other, (int, float, np.number)):
             data = self.array + other
@@ -554,7 +570,7 @@ class NDImage:
         data = self.array + other
         return NDImage(data, extent=self.extent, metadata=self.metadata)
 
-    def __mul__(self, other):
+    def __mul__(self, other) -> NDImage:
         """Multiply image."""
         if isinstance(other, NDImage):
             other = other.array
@@ -562,7 +578,7 @@ class NDImage:
         data = self.array * other
         return NDImage(data, extent=self.extent, metadata=self.metadata)
 
-    def __rmul__(self, other):
+    def __rmul__(self, other) -> NDImage:
         """Multiply image."""
         return self.__mul__(other)
 
@@ -574,11 +590,11 @@ class NDImage:
         data = self.array / other
         return NDImage(data, extent=self.extent, metadata=self.metadata)
 
-    def __sub__(self, other):
+    def __sub__(self, other) -> NDImage:
         """Subtract two images."""
         return self + (other * -1)
 
-    def __eq__(self, other):
+    def __eq__(self, other) -> bool:
         """Check if two images are equal."""
         if not isinstance(other, NDImage):
             return False
@@ -589,7 +605,7 @@ class NDImage:
         return np.allclose(self.array, other.array)
 
     @classmethod
-    def test_image(cls):
+    def test_image(cls) -> NDImage:
         """Returns a test image."""
 
         extent = Extent((-10, 0, 0, 20))
@@ -604,7 +620,7 @@ class NDImage:
         return NDImage(array, extent=extent)
 
     @classmethod
-    def from_png(cls, path, extent=None):
+    def from_png(cls, path, extent=None) -> NDImage:
         """Load image from PNG file."""
         array = np.mean(matplotlib.image.imread(path), axis=2).T  # convert to grayscale
         if extent is None:
