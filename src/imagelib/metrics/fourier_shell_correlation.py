@@ -42,7 +42,9 @@ def _find_first_below_threshold(fsc_values, fsc_frequencies, threshold):
     raise ValueError("FSC values never drop below the threshold.")
 
 
-def fourier_shell_correlation(image1: Image, image2: Image, num_shells: int) -> list:
+def fourier_shell_correlation(
+    image1: Image, image2: Image, num_shells: int
+) -> tuple[np.ndarray, np.ndarray]:
     """Computes the Fourier Shell Correlation (FSC) between two 3D images.
 
     Parameters
@@ -90,19 +92,26 @@ def fourier_shell_correlation(image1: Image, image2: Image, num_shells: int) -> 
     return fsc_frequencies, fsc_values
 
 
-def _compute_largest_maximum(grid):
+def _compute_largest_maximum(grid: np.ndarray) -> float:
+    """Computes the largest maximum radius in the Fourier grid."""
     flatgrid = grid.reshape(-1, grid.shape[-1])
     max_per_axis = np.max(np.abs(flatgrid), axis=0)
     largest_max = np.max(max_per_axis)
     return largest_max
 
 
-def _check_input_fourier_shell_correlation(image1, image2, num_shells):
+def _check_input_fourier_shell_correlation(
+    image1: Image, image2: Image, num_shells: int
+) -> None:
     """Checks the input parameters for the fourier_shell_correlation function."""
-    assert isinstance(image1, Image), "image1 must be an instance of Image"
-    assert isinstance(image2, Image), "image2 must be an instance of Image"
-    assert image1.shape == image2.shape, "Images must have the same shape"
-    assert image1.extent == image2.extent, "Images must have the same extent"
-    assert isinstance(num_shells, int) and num_shells > 0, (
-        "num_shells must be a positive integer"
-    )
+    if not isinstance(image1, Image):
+        raise TypeError("image1 must be an instance of Image")\
+    if not isinstance(image2, Image):
+        raise TypeError("image2 must be an instance of Image")
+    if image1.shape != image2.shape:
+        raise ValueError("Images must have the same shape")
+    if image1.extent != image2.extent:
+        raise ValueError("Images must have the same extent")
+    if not isinstance(num_shells, int) or num_shells <= 0:
+        raise ValueError("num_shells must be a positive integer")
+
