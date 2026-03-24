@@ -113,7 +113,7 @@ def threshold_half_bit(num_voxels: np.ndarray) -> np.ndarray:
 
 def compute_resolution_from_fsc(
     fsc_result: FSCResult,
-    threshold_func: Callable = threshold_2sigma,
+    threshold_func: Callable = threshold_half_bit,
     smoothing_size: int = 10,
 ) -> float:
     """Computes the resolution from the FSC result using a given threshold function.
