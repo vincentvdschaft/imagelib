@@ -1,3 +1,5 @@
+import timeit
+
 import matplotlib.pyplot as plt
 import numpy as np
 
@@ -14,6 +16,10 @@ image1, image2 = (
 )
 print(np.sum(image1.array - image2.array))
 
+time = timeit.timeit(
+    lambda: fourier_shell_correlation(image1, image2, num_shells=600), number=1
+)
+print(f"FSC computation took {time:.2f} seconds")
 frc = fourier_shell_correlation(image1, image2, num_shells=600)
 resolutions = 1 / frc.frequencies
 plt.plot(frc.frequencies, frc.correlations)
