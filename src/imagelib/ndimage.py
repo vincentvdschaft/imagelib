@@ -408,6 +408,31 @@ class NDImage:
 
         return self.with_array(array)
 
+    def symlog_compress(self, threshold=1.0) -> NDImage:
+        """Symmetric log-compress image data."""
+
+        data = np.where(
+            np.abs(self.array) > threshold,
+            np.sign(self.array)
+            * (threshold + np.log10(np.abs(self.array) / threshold)),
+            self.array,
+        )
+
+        return NDImage(data, extent=self.extent, metadata=self.metadata)
+
+    def symlog_expand(self, threshold=1.0) -> NDImage:
+        """Symmetric log-expand image data."""
+
+        array = np.where(
+            np.abs(self.array) > threshold,
+            np.sign(self.array)
+            * threshold
+            * np.power(10, (np.abs(self.array) - threshold) / threshold),
+            self.array,
+        )
+
+        return self.with_array(array)
+
     def abs(self) -> NDImage:
         """Returns the absolute value of the image."""
         return self.with_array(np.abs(self.array))
