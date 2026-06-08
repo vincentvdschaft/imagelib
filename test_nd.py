@@ -1,65 +1,35 @@
+import timeit
+
 import matplotlib.pyplot as plt
 import numpy as np
 
-from imagelib.extent import Extent
-from imagelib.ndimage import NDImage
-
-image = NDImage(np.random.randn(4, 5, 5), extent=(0, 3, -1, 1, 0, 1))
-print(
-    image[
-        :,
-        1,
-        ...,
-    ]
-)
-image + np.array(5)
-print(image.log_expand())
-image_normalized = image.normalize()
-
-# print(image.clip(0, 1).array)
-
-
-image_square = image.square_pixels()
-print(image_square)
-fig, axes = plt.subplots(1, 2, figsize=(10, 5))
-axes[0].imshow(
-    image[0].log_compress().normalize_db().clip(-60, 0).T,
-    origin="lower",
-    extent=image.extent_imshow,
-    aspect="equal",
-)
-axes[1].imshow(
-    image_square[..., 0].T,
-    origin="lower",
-    extent=image_square.extent_imshow,
-    aspect="equal",
+from imagelib import Image
+from imagelib.metrics import (
+    fourier_shell_correlation,
+    threshold_2sigma,
+    threshold_half_bit,
 )
 
+image1, image2 = (
+    Image.load("RF_002.hdf5").normalize(),
+    Image.load("RF_003.hdf5").normalize(),
+)
+print(np.sum(image1.array - image2.array))
+
+time = timeit.timeit(
+    lambda: fourier_shell_correlation(image1, image2, num_shells=600), number=1
+)
+print(f"FSC computation took {time:.2f} seconds")
+frc = fourier_shell_correlation(image1, image2, num_shells=600)
+resolutions = 1 / frc.frequencies
+plt.plot(frc.frequencies, frc.correlations)
+plt.plot(frc.frequencies, threshold_2sigma(frc.num_voxels_in_shell), label="2-sigma")
+plt.plot(frc.frequencies, threshold_half_bit(frc.num_voxels_in_shell), label="Half-bit")
+xticks = plt.xticks()
+plt.xticks(xticks[0], [f"{1 / f:.2f}" if f > 0 else "Inf" for f in xticks[0]])
+plt.xlabel("Frequency")
+plt.ylabel("FSC")
+plt.title("Fourier Shell Correlation")
+plt.legend()
+plt.grid()
 plt.show()
-print(image.square_pixels())
-print(image.get_window(Extent((-0.8, 0.8, -0.8, 0.8, -10, 10))))
-exit()
-print(np.square(image).metadata)
-
-exit()
-image = NDImage(np.ones((25, 25)), extent=(-1, 1, -1, 1))
-grid = image.grid
-image = NDImage(
-    np.sin(np.pi * grid[..., 0]) * np.cos(np.pi * grid[..., 1]),
-    extent=(-1, 1, -1, 1),
-)
-
-resamples = image.resample(shape=(100, 100))
-print(resamples)
-fig, axes = plt.subplots(1, 2, figsize=(10, 5))
-axes[0].imshow(image, origin="lower", extent=image.extent_imshow)
-axes[1].imshow(resamples, origin="lower", extent=resamples.extent_imshow)
-plt.show()
-
-print(image.resample(shape=(10, 10)))
-image[:3].save("test.hdf5")
-
-
-image_loaded = NDImage.load("test.hdf5")
-print(image_loaded)
-print(image[:3, 2:])

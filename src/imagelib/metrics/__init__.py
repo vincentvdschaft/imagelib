@@ -1,6 +1,13 @@
 from .fourier_shell_correlation import (
+    compute_resolution_from_fsc,
     fourier_shell_correlation,
-    fourier_shell_correlation_cutoff_resolution,
+    threshold_2sigma,
+    threshold_half_bit,
 )
 
-__all__ = ["fourier_shell_correlation", "fourier_shell_correlation_cutoff_resolution"]
+__all__ = [
+    "fourier_shell_correlation",
+    "compute_resolution_from_fsc",
+    "threshold_2sigma",
+    "threshold_half_bit",
+]
