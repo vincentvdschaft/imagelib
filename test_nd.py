@@ -37,7 +37,7 @@ axes[1].imshow(
 
 plt.show()
 print(image.square_pixels())
-print(image.get_window(extent=(-0.8, 0.8, -0.8, 0.8, -10, 10)))
+print(image.get_window(Extent((-0.8, 0.8, -0.8, 0.8, -10, 10))))
 exit()
 print(np.square(image).metadata)
 
