@@ -178,6 +178,18 @@ def test_add_metadata(fixture_image, key, value):
     assert image.metadata[key] == value
 
 
+def test_metadata_list_of_arrays_roundtrip(fixture_image, tmp_path):
+    """Tests that a list of numpy arrays saved as metadata round-trips correctly."""
+    arrays = [np.random.rand(5, 3) for _ in range(3)]
+    image = fixture_image.add_metadata("frames", arrays)
+    image.save(tmp_path / "test.hdf5")
+    loaded = Image.load(tmp_path / "test.hdf5")
+    assert isinstance(loaded.metadata["frames"], list)
+    assert len(loaded.metadata["frames"]) == 3
+    for original, recovered in zip(arrays, loaded.metadata["frames"]):
+        assert np.allclose(original, recovered)
+
+
 def test_append_metadata(fixture_image_with_metadata):
     """Tests appending metadata to an image."""
     fixture_image_with_metadata.append_metadata("new_key", "new_value")
@@ -259,8 +271,28 @@ def test_log_compress(fixture_image):
 
 
 def test_window(fixture_image):
-    """Tests the get_window method."""
+    """Existing Extent-based call still works."""
     window = fixture_image.get_window(Extent((0, 1, 0, 1)))
+    assert isinstance(window, Image)
+
+
+def test_window_partial_dim0(fixture_image):
+    """Slicing only dim 0 leaves dim 1 untouched."""
+    window = fixture_image.get_window([(0, 1), None])
+    assert window.shape[1] == fixture_image.shape[1]
+
+
+def test_window_partial_dim1(fixture_image):
+    """Slicing only dim 1 leaves dim 0 untouched."""
+    window = fixture_image.get_window([None, (0, 1)])
+    assert window.shape[0] == fixture_image.shape[0]
+
+
+def test_window_zero_dim_size():
+    """No division by zero when a dimension has zero spatial size."""
+    img = Image(np.zeros((10, 1)), extent=(-1, 1, 0.5, 0.5))
+    result = img.get_window([(-1, 0), (0.5, 0.5)])
+    assert result is not None
 
 
 def test_coordinates_to_indices(fixture_image):
