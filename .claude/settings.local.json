@@ -1,3 +1,11 @@
 {
+  "permissions": {
+    "allow": [
+      "Bash(/home/vincent/2-files/pymodules/imagelib/.venv/bin/python3.12 /home/vincent/2-files/pymodules/imagelib/src/imagelib/ndimage.py)",
+      "Bash(/home/vincent/2-files/pymodules/imagelib/.venv/bin/pytest /home/vincent/2-files/pymodules/imagelib/tests/ -x -q)",
+      "Read(//home/vincent/2-files/pymodules/imagelib/.venv/bin/**)",
+      "Bash(python3.12 --version)"
+    ]
+  },
   "outputStyle": "Explanatory"
 }

@@ -343,10 +343,11 @@ class NDImage:
             factor if (axes is None or dim in axes) else 1 for dim in range(self.ndim)
         ]
         new_shape = [
-            int(dim_size * factor_for_dim)
+            max(1, int(dim_size * factor_for_dim))
             for dim_size, factor_for_dim in zip(self.shape, factors)
         ]
-        return self.resample(shape=new_shape, extent=self.extent, method="linear")
+        new_extent = _collapse_extent_for_single_element_dims(self.extent, new_shape)
+        return self.resample(shape=new_shape, extent=new_extent, method="linear")
 
     def get_window(self, extent: Extent) -> NDImage:
         """Returns a new image that contains only the pixels in the window.
@@ -650,6 +651,17 @@ class NDImage:
 # ==============================================================================
 # Helper functions
 # ==============================================================================
+def _collapse_extent_for_single_element_dims(extent: Extent, shape) -> Extent:
+    new_initializer = []
+    for dim in range(extent.ndim):
+        if shape[dim] == 1:
+            center = (extent.start(dim) + extent.end(dim)) / 2
+            new_initializer.extend([center, center])
+        else:
+            new_initializer.extend([extent.start(dim), extent.end(dim)])
+    return Extent(new_initializer)
+
+
 def _check_ndimage_initializers(array, extent: Extent):
     assert array.ndim == extent.ndim, (
         "The array and extent must have the same number of dimensions. "
