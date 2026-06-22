@@ -559,6 +559,30 @@ class NDImage:
             indices_total.append(indices_rounded)
         return np.stack(indices_total, axis=-1)
 
+    def indices_to_coordinates(self, indices) -> np.ndarray:
+        """Convert pixel indices to physical coordinates.
+
+        Parameters
+        ----------
+        indices : np.ndarray of shape (N, D)
+            Pixel indices (integer or float) to convert. D must match the image
+            dimensionality. Float indices yield sub-pixel coordinates.
+
+        Returns
+        -------
+        np.ndarray of shape (N, D)
+            Physical coordinates corresponding to each index.
+        """
+        indices = np.asarray(indices)
+        assert indices.ndim == 2
+        assert indices.shape[1] == self.ndim
+        coords = []
+        for dim in range(self.ndim):
+            coords.append(
+                self.extent.start(dim) + indices[:, dim] * self.pixel_size(dim)
+            )
+        return np.stack(coords, axis=-1)
+
     def clahe(
         self,
         clip_limit: float = 0.01,
