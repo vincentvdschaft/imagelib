@@ -92,7 +92,7 @@ class Extent(tuple):
         return self_sorted[dim * 2 + 1] - self_sorted[dim * 2]
 
     @property
-    def size(self):
+    def dim_sizes(self):
         """Returnss (width, height) of the extent."""
         return [self.dim_size(n) for n in range(self.ndim)]
 
