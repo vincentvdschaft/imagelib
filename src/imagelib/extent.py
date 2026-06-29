@@ -93,8 +93,19 @@ class Extent(tuple):
 
     @property
     def dim_sizes(self):
-        """Returnss (width, height) of the extent."""
+        """Returns (width, height) of the extent."""
         return [self.dim_size(n) for n in range(self.ndim)]
+
+    @property
+    def dim_scales(self):
+        """Returns the dimension sizes where zeros are replaced with ones to avoid division by zero."""
+        return [size if size != 0 else 1 for size in self.dim_sizes]
+
+    @property
+    def origin(self):
+        """Returns the origin (x0, y0, ...) of the extent."""
+        self_sorted = self.sort()
+        return tuple(self_sorted[dim * 2] for dim in range(self.ndim))
 
     @property
     def width(self):

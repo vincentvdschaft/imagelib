@@ -92,15 +92,17 @@ class NDImage:
 
     def pixel_size(self, dim) -> float:
         """Returns the pixel size in the given dimension."""
-        return (
-            self.extent.dim_size(dim) / (self.shape[dim] - 1)
-            if self.shape[dim] > 1
-            else 0.0
-        )
+        return self.pixel_sizes[dim]
 
     @property
     def pixel_sizes(self) -> np.ndarray:
         return compute_pixel_sizes(self.extent, self.shape)
+
+    @property
+    def pixel_scales(self) -> np.ndarray:
+        """Returns the scaling to apply to convert pixel indices to physical coordinates."""
+        with np.errstate(divide="ignore", invalid="ignore"):
+            return np.where(self.pixel_sizes > 0, self.pixel_sizes, 1e-6)
 
     @property
     def pixel_width(self) -> float:
@@ -707,9 +709,9 @@ def correct_extent_for_imshow(extent: Extent, shape):
     return Extent(new_initializer)
 
 
-def compute_pixel_sizes(extent: Extent, shape):
+def compute_pixel_sizes(extent: Extent, shape) -> np.ndarray:
     pixel_sizes = []
     for dim in range(extent.ndim):
         pixel_size = extent.dim_size(dim) / (shape[dim] - 1) if shape[dim] > 1 else 0.0
         pixel_sizes.append(pixel_size)
-    return pixel_sizes
+    return np.array(pixel_sizes)

@@ -1,7 +1,6 @@
-import numpy as np
 import pytest
 
-from imagelib import Extent, Image
+from imagelib import Extent
 
 
 def test_extent_initialize_from_tuple(fixture_extent_tuple):
@@ -91,3 +90,9 @@ def test_ylims(fixture_extent):
 def test_ylims_flipped(fixture_extent):
     """Tests the ylims_flipped property of the extent object."""
     assert fixture_extent.ylims_flipped == (fixture_extent.y1, fixture_extent.y0)
+
+
+def test_dim_sizes(fixture_extent):
+    """Tests the dim_size method of the extent object."""
+    assert fixture_extent.dim_size(0) == fixture_extent.width
+    assert fixture_extent.dim_size(1) == fixture_extent.height
