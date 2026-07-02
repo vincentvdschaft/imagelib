@@ -1,6 +1,119 @@
 """Extent class for storing image extents."""
 
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+from typing import Sequence, Union
+
 import numpy as np
+
+
+@dataclass
+class Limits:
+    min: float
+    max: float
+
+    def __post_init__(self):
+        self.min = float(self.min)
+        self.max = float(self.max)
+        true_min = min(self.min, self.max)
+        true_max = max(self.min, self.max)
+        self.min = true_min
+        self.max = true_max
+
+    def size(self) -> float:
+        return self.max - self.min
+
+    def __iter__(self):
+        yield self.min
+        yield self.max
+
+    def __repr__(self):
+        return f"Limits({self.min}, {self.max})"
+
+    def __hash__(self):
+        return hash((self.min, self.max))
+
+
+LimitsLike = Union["Limits", tuple[float, float], Sequence[float]]
+LimitsNDInput = Union[
+    "LimitsND",
+    Sequence[LimitsLike],  # tuple of tuples / list of Limits
+    Sequence[float],  # flat tuple
+    np.ndarray,  # (N, 2) or flat (2N,)
+]
+
+
+@dataclass
+class LimitsND:
+    limits: list[Limits] = field(default_factory=list)
+
+    def __post_init__(self):
+        raw = self.limits
+
+        # already a LimitsND-shaped list of Limits objects
+        if all(isinstance(item, Limits) for item in raw):
+            return
+
+        arr = np.asarray(raw, dtype=float)
+
+        if arr.ndim == 1:
+            if arr.size % 2 != 0:
+                raise ValueError(
+                    f"Flat input must have an even number of elements, got {arr.size}"
+                )
+            arr = arr.reshape(-1, 2)
+        elif arr.ndim != 2 or arr.shape[1] != 2:
+            raise ValueError(f"Expected shape (N, 2) or flat (2N,), got {arr.shape}")
+
+        self.limits = [Limits(lo, hi) for lo, hi in arr]
+
+    @property
+    def ndim(self) -> int:
+        return len(self.limits)
+
+    def __getitem__(self, index) -> Limits:
+        return self.limits[index]
+
+    def sizes(self) -> np.ndarray:
+        return np.array([limit.size() for limit in self.limits])
+
+    @classmethod
+    def from_extent(cls, extent: Extent) -> LimitsND:
+        """Create a LimitsND object from an Extent object."""
+        limits = []
+        for dim in range(extent.ndim):
+            limits.append(Limits(extent.start(dim), extent.end(dim)))
+        return cls(limits)
+
+    @classmethod
+    def from_shape(cls, shape: tuple[int, ...]) -> LimitsND:
+        """Create a LimitsND object from a shape tuple, where each dimension's limits are (0, size-1)."""
+        limits = []
+        for size in shape:
+            limits.append(Limits(0, size - 1))
+        return cls(limits)
+
+    def to_extent(self) -> Extent:
+        """Convert the LimitsND object back to an Extent object."""
+        extent_coords = []
+        for limit in self.limits:
+            extent_coords.append(limit.min)
+            extent_coords.append(limit.max)
+        return Extent(extent_coords)
+
+    def __iter__(self):
+        return iter(self.limits)
+
+    def __len__(self):
+        return len(self.limits)
+
+    def origin(self) -> np.ndarray:
+        """Return the origin (min values) of the limits as a numpy array."""
+        return np.array([limit.min for limit in self.limits])
+
+    def __hash__(self):
+        return hash(tuple(self))
 
 
 class Extent(tuple):

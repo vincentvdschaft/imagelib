@@ -10,21 +10,26 @@ from scipy.ndimage import uniform_filter1d
 
 from .clahe import clahe
 from .dynamic_range import apply_dynamic_range_curve
-from .extent import Extent, compute_extent_after_slicing
+from .extent import Extent, LimitsND, compute_extent_after_slicing
 from .match_histograms import match_histograms
 from .saving import load_hdf5_image, save_hdf5_image
 
 
 class NDImage:
-    def __init__(self, array, extent=None, metadata=None):
-        if extent is None:
-            extent = self._extent_from_array(array)
-        extent = Extent(extent).sort()
-        _check_ndimage_initializers(array, extent)
+    def __init__(
+        self, array, extent=None, metadata=None, labels=None, units=None, limits=None
+    ):
         self.array = np.asarray(array).copy()
         self.array.setflags(write=True)
-        self._extent = extent
+        if limits is not None:
+            self._limits: LimitsND = LimitsND(limits)
+        elif extent is not None:
+            self._limits: LimitsND = LimitsND.from_extent(Extent(extent))
+        else:
+            self._limits: LimitsND = LimitsND.from_shape(array.shape)
         self._metadata = {}
+        self._labels = self._get_initialized_labels(labels)
+        self._units = units if units is not None else ()
         if metadata is not None:
             self.update_metadata(metadata)
 
@@ -39,10 +44,36 @@ class NDImage:
 
     @property
     def extent(self) -> Extent:
-        return Extent(self._extent)
+        return self._limits.to_extent()
+
+    @property
+    def limits(self) -> LimitsND:
+        return self._limits
+
+    @property
+    def labels(self) -> tuple:
+        return self._labels
+
+    @property
+    def units(self) -> tuple:
+        return self._units
 
     def __repr__(self) -> str:
         return f"NDImage(array={self.shape}, extent={self.extent!r})"
+
+    def _get_initialized_labels(self, labels=None) -> tuple:
+        if labels is not None:
+            assert len(labels) == self.ndim, (
+                "The number of labels must match the number of dimensions. "
+                f"Got {len(labels)} and {self.ndim}."
+            )
+            return tuple(labels)
+
+        labels = [f"dim_{i}" for i in range(self.ndim)]
+        labels[-1] = "x"
+        if self.ndim > 1:
+            labels[-2] = "y"
+        return tuple(labels)
 
     # ==========================================================================
     # Numpy array interface
@@ -92,11 +123,11 @@ class NDImage:
 
     def pixel_size(self, dim) -> float:
         """Returns the pixel size in the given dimension."""
-        return self.pixel_sizes[dim]
+        return float(self.pixel_sizes[dim])
 
     @property
     def pixel_sizes(self) -> np.ndarray:
-        return compute_pixel_sizes(self.extent, self.shape)
+        return compute_pixel_sizes(self.limits, self.shape)
 
     @property
     def pixel_scales(self) -> np.ndarray:
@@ -105,19 +136,9 @@ class NDImage:
             return np.where(self.pixel_sizes > 0, self.pixel_sizes, 1e-6)
 
     @property
-    def pixel_width(self) -> float:
-        """Returns the pixel width."""
-        return self.pixel_size(0)
-
-    @property
-    def pixel_height(self) -> float:
-        """Returns the pixel height."""
-        return self.pixel_size(1)
-
-    @property
     def extent_imshow(self) -> Extent:
         """Returns the extent adjusted for imshow."""
-        return correct_extent_for_imshow(self.extent, self.shape)
+        return get_extent_imshow(self.limits, self.shape)
 
     # ==========================================================================
     # Forward properties
@@ -354,10 +375,8 @@ class NDImage:
     def get_window(self, extent: Extent) -> NDImage:
         """Returns a new image that contains only the pixels in the window.
 
-        Parameters
-        ----------
-        extent : Extent
-            The extent of the window to extract (in the image units, not pixel indices).
+        Args:
+            extent: The extent of the window to extract (in the image units, not pixel indices).
         """
         extent = Extent(extent)
 
@@ -534,15 +553,12 @@ class NDImage:
     def sample(self, positions) -> np.ndarray:
         """Sample image values at the given spatial positions without interpolation.
 
-        Parameters
-        ----------
-        positions : np.ndarray of shape (N, D)
-            Spatial coordinates to sample. D must match the image dimensionality.
+        Args:
+            positions: np.ndarray of shape (N, D) Spatial coordinates to sample. D
+            must match the image dimensionality.
 
-        Returns
-        -------
-        np.ndarray of shape (N,)
-            Image values at the nearest pixel for each position.
+        Returns:
+            values: Image values at the nearest pixel for each position of shape (N,) .
         """
         indices = self.coordinates_to_indices(positions)
         return self.array[tuple(indices[:, dim] for dim in range(self.ndim))]
@@ -564,16 +580,12 @@ class NDImage:
     def indices_to_coordinates(self, indices) -> np.ndarray:
         """Convert pixel indices to physical coordinates.
 
-        Parameters
-        ----------
-        indices : np.ndarray of shape (N, D)
-            Pixel indices (integer or float) to convert. D must match the image
+        Args:
+            indices: Pixel indices (integer or float) to convert. D must match the image
             dimensionality. Float indices yield sub-pixel coordinates.
 
-        Returns
-        -------
-        np.ndarray of shape (N, D)
-            Physical coordinates corresponding to each index.
+        Returns:
+            coordinates: Physical coordinates corresponding to each index of shape (N, D).
         """
         indices = np.asarray(indices)
         assert indices.ndim == 2
@@ -688,16 +700,34 @@ def _collapse_extent_for_single_element_dims(extent: Extent, shape) -> Extent:
     return Extent(new_initializer)
 
 
-def _check_ndimage_initializers(array, extent: Extent):
-    assert array.ndim == extent.ndim, (
-        "The array and extent must have the same number of dimensions. "
-        f"Got {array.ndim} and {extent.ndim}."
+def _check_ndimage_initializers(array: np.ndarray, limits: LimitsND):
+    assert array.ndim == limits.ndim, (
+        "The array and limits must have the same number of dimensions. "
+        f"Got {array.ndim} and {limits.ndim}."
     )
     for dim in range(array.ndim):
-        if array.shape[dim] == 1 and not extent.dim_size(dim) == 0.0:
+        if array.shape[dim] == 1 and not limits[dim].size() == 0.0:
             raise ValueError(
-                "Dimensions with one element must have zero size in the extent"
+                "Dimensions with one element must have zero size in the limits"
             )
+
+
+def get_extent_imshow(limits: LimitsND, shape: tuple) -> Extent:
+    """Compute the extent for imshow based on limits and shape.
+
+    Args:
+        limits: The limits in order y, x.
+        shape: The shape of the image in order y, x.
+
+    Returns:
+        Extent: The extent for imshow [x0, x1, y0, y1].
+    """
+    extent = []
+    for n_pixels, limits in zip(shape, limits):
+        pixel_size = limits.size() / (n_pixels - 1) if n_pixels > 1 else 0.0
+        extent.append(limits.min - pixel_size / 2)
+        extent.append(limits.max + pixel_size / 2)
+    return Extent(extent)
 
 
 def correct_extent_for_imshow(extent: Extent, shape):
@@ -709,9 +739,9 @@ def correct_extent_for_imshow(extent: Extent, shape):
     return Extent(new_initializer)
 
 
-def compute_pixel_sizes(extent: Extent, shape) -> np.ndarray:
+def compute_pixel_sizes(limits: LimitsND, shape) -> np.ndarray:
     pixel_sizes = []
-    for dim in range(extent.ndim):
-        pixel_size = extent.dim_size(dim) / (shape[dim] - 1) if shape[dim] > 1 else 0.0
+    for dim in range(limits.ndim):
+        pixel_size = limits[dim].size() / (shape[dim] - 1) if shape[dim] > 1 else 0.0
         pixel_sizes.append(pixel_size)
     return np.array(pixel_sizes)
