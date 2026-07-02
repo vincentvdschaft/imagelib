@@ -1,3 +1,4 @@
+from .extent import Limits, LimitsND
 from .ndimage import NDImage as Image
 from .saving import check_hdf5_image_hash, load_hdf5_image, save_hdf5_image
 
@@ -7,4 +8,6 @@ __all__ = [
     "load_hdf5_image",
     "check_hdf5_image_hash",
     "metrics",
+    "Limits",
+    "LimitsND",
 ]
