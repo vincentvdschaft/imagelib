@@ -22,26 +22,28 @@ The virtual environment is at `.venv/` (Python 3.12). Activate with `source .ven
 
 ## Architecture
 
-`imagelib` is a Python library providing an `NDImage` class — a numpy array bundled with physical spatial extent metadata, so dimensions (x, y, z ranges) stay synchronized through transformations.
+`imagelib` is a Python library providing an `NDImage` class — a numpy array bundled with physical spatial limits metadata, so dimensions stay synchronized through transformations. The API is dimension-agnostic: methods take a `dim` index rather than having per-axis variants (no `xflip`, `x0`, etc.) — this keeps the same code working regardless of how many dimensions an image has or what they represent.
 
 ### Core classes
 
-**`Extent`** (`imagelib/extent.py`) — immutable tuple subclass storing physical coordinates as `(x0, x1, y0, y1, ...)`. Indexed by dimension: `extent.start(dim)`, `extent.end(dim)`. Supports arithmetic operators that broadcast across all elements.
+**`Limits`** / **`LimitsND`** (`imagelib/extent.py`) — `Limits` is a `(min, max)` pair for one dimension (auto-sorted on construction). `LimitsND` wraps a list of `Limits`, one per array dimension, and accepts flexible input (list of pairs, flat tuple, `(N, 2)` array, or another `LimitsND`). Indexed by dimension: `limits[dim].min` / `.max` / `.size()`.
 
-**`NDImage`** (`imagelib/ndimage.py`) — the main class, exposed as `Image` from the package. Wraps a numpy array with an `Extent`. Key design principles:
+**`Extent`** (`imagelib/extent.py`) — legacy flat-tuple encoding `(dim0_min, dim0_max, dim1_min, dim1_max, ...)`. Kept only to decode HDF5 files written before the switch to `LimitsND`; not part of the public API.
+
+**`NDImage`** (`imagelib/ndimage.py`) — the main class, exposed as `Image` from the package. Wraps a numpy array with a `LimitsND`. Key design principles:
 - All operations return a new `NDImage` (immutable-style)
-- Implements `__array_ufunc__` and `__array_function__` so numpy ufuncs (e.g. `np.sin(image)`) work transparently, preserving extent
-- Slicing via `__getitem__` recomputes extent from the physical coordinate grid, so `image[:65]` correctly updates the extent
-- `extent_imshow` adjusts extent by half a pixel for use with `matplotlib.imshow` (which treats extent as pixel edges, not centers)
+- Implements `__array_ufunc__` and `__array_function__` so numpy ufuncs (e.g. `np.sin(image)`) work transparently, preserving limits
+- Slicing via `__getitem__` recomputes limits from the physical coordinate grid, so `image[:65]` correctly updates the limits
+- `flip(dim)` flips the array along a dimension without changing its limits
+- `extent_imshow` returns the `(x0, x1, y0, y1)` tuple for the *last two* dimensions, adjusted by half a pixel, for use with `matplotlib.imshow` (which treats extent as pixel edges, not centers)
 
-**`saving.py`** — HDF5 serialization via h5py. Supports nested dict metadata with list-to-numbered-dict round-trip encoding.
+**`saving.py`** — HDF5 serialization via h5py. Saves limits under the `limits` attribute; loading falls back to the legacy `extent` attribute (via `Extent`) for old files. Supports nested dict metadata with list-to-numbered-dict round-trip encoding.
 
 ### Public API (from `imagelib import *`)
 
 - `Image` — the main class (`NDImage`)
-- `Extent` — spatial extent class
 - `save_hdf5_image`, `load_hdf5_image`, `check_hdf5_image_hash` — standalone HDF5 I/O
 
 ### Coordinate convention
 
-Extent stores coordinates as `(dim0_start, dim0_end, dim1_start, dim1_end, ...)`. Array axis 0 = x, axis 1 = y. When plotting with `imshow`, use `image.array.T` and `extent=image.extent_imshow` (or `image.extent` for `[x0, x1, y0, y1]` order expected by matplotlib's `extent` parameter when `origin="lower"`).
+Array axes are ordered zyx: the last axis is x, the second-to-last is y, and any leading axes are additional (e.g. z, time). Default dimension labels reflect this (`labels[-1] == "x"`, `labels[-2] == "y"`). When plotting a 2D image with `imshow`, use `image.array.T` and `extent=image.extent_imshow` with `origin="lower"`.

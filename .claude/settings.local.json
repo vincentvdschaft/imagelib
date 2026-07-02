@@ -5,7 +5,11 @@
       "Bash(/home/vincent/2-files/pymodules/imagelib/.venv/bin/pytest /home/vincent/2-files/pymodules/imagelib/tests/ -x -q)",
       "Read(//home/vincent/2-files/pymodules/imagelib/.venv/bin/**)",
       "Bash(python3.12 --version)",
-      "Bash(.venv/bin/pytest tests/ -q)"
+      "Bash(.venv/bin/pytest tests/ -q)",
+      "Bash(grep -rln \"from imagelib\\\\|import imagelib\" --include=\"*.py\" ~ 2>/dev/null | grep -v \"/2-files/pymodules/imagelib/\" | grep -v \".venv\" | head -30)",
+      "Read(//home/vincent/**)",
+      "Bash(.venv/bin/pytest -q)",
+      "Bash(.venv/bin/python -c ' *)"
     ]
   },
   "outputStyle": "Explanatory"

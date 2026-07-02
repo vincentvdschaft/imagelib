@@ -4,10 +4,10 @@ from pathlib import Path
 import h5py
 import numpy as np
 
-from .extent import Extent, compute_extent_after_slicing
+from .extent import Extent, LimitsND, LimitsNDInput, compute_limits_after_slicing
 
 
-def save_hdf5_image(path, array, extent: Extent, metadata=None):
+def save_hdf5_image(path, array, limits: LimitsNDInput, metadata=None):
     """
     Saves an image to an hdf5 file.
 
@@ -17,13 +17,13 @@ def save_hdf5_image(path, array, extent: Extent, metadata=None):
         The path to the hdf5 file.
     array : np.ndarray
         The image to save.
-    extent : list
-        The extent of the image (x0, x1, z0, z1).
+    limits : LimitsNDInput
+        The spatial limits of the image, one (min, max) pair per dimension.
     metadata : dict
         Additional metadata to save.
     """
 
-    extent = Extent(extent).sort()
+    limits = LimitsND(limits)
 
     path = Path(path)
 
@@ -34,9 +34,18 @@ def save_hdf5_image(path, array, extent: Extent, metadata=None):
 
     with h5py.File(path, "w") as dataset:
         dataset.create_dataset("image", data=array)
-        dataset["image"].attrs["extent"] = extent
+        dataset["image"].attrs["limits"] = _limits_to_array(limits)
         if metadata is not None:
             save_dict_to_hdf5(dataset, metadata)
+
+
+def _limits_to_array(limits: LimitsND) -> np.ndarray:
+    """Flatten LimitsND to (dim0_min, dim0_max, dim1_min, dim1_max, ...)."""
+    flat = []
+    for dim_limits in limits:
+        flat.append(dim_limits.min)
+        flat.append(dim_limits.max)
+    return np.array(flat)
 
 
 def load_hdf5_image(path, indices=slice(None)):
@@ -52,24 +61,29 @@ def load_hdf5_image(path, indices=slice(None)):
 
     Returns
     -------
-    image : np.ndarray
-        The image.
-    extent : np.ndarray
-        The extent of the image (x0, x1, z0, z1).
+    image : NDImage
+        The loaded image.
     """
 
     with h5py.File(path, "r") as dataset:
         original_shape = dataset["image"].shape
         array = dataset["image"][indices]
-        extent = Extent(dataset["image"].attrs["extent"])
-        extent = compute_extent_after_slicing(
-            current_shape=original_shape, extent=extent, key=indices
+        limits = _read_limits(dataset["image"].attrs)
+        limits = compute_limits_after_slicing(
+            current_shape=original_shape, limits=limits, key=indices
         )
         metadata = load_hdf5_to_dict(dataset)
         metadata.pop("image", None)
     from .ndimage import NDImage
 
-    return NDImage(array=array, extent=extent, metadata=metadata)
+    return NDImage(array=array, limits=limits, metadata=metadata)
+
+
+def _read_limits(attrs) -> LimitsND:
+    """Reads limits from HDF5 attrs, falling back to the legacy 'extent' format."""
+    if "limits" in attrs:
+        return LimitsND(np.asarray(attrs["limits"]))
+    return LimitsND.from_extent(Extent(attrs["extent"]))
 
 
 def save_dict_to_hdf5(hdf5_file, data_dict, parent_group="/"):

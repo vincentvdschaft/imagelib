@@ -1,9 +1,10 @@
 from pathlib import Path
 
+import h5py
 import numpy as np
 import pytest
 
-from imagelib import Extent, Image
+from imagelib import Image
 
 
 def _dict_equal(dict1, dict2):
@@ -20,11 +21,13 @@ def _dict_equal(dict1, dict2):
     return True
 
 
-def test_initialize_image(fixture_image_data, fixture_extent):
+def test_initialize_image(fixture_image_data, fixture_limits):
     """Initializes an image object."""
-    image = Image(array=fixture_image_data, extent=fixture_extent)
+    image = Image(array=fixture_image_data, limits=fixture_limits)
     assert np.allclose(image.array, fixture_image_data)
-    assert image.extent == fixture_extent
+    for dim, (lo, hi) in enumerate(fixture_limits):
+        assert image.limits[dim].min == lo
+        assert image.limits[dim].max == hi
     assert image.shape == fixture_image_data.shape
 
 
@@ -87,25 +90,26 @@ def test_sub(fixture_image):
 def test_resample(fixture_image):
     """Tests resampling of an image."""
     new_shape = (20, 50)
-    new_extent = Extent((0, 1, 0, 1))
-    image = fixture_image.resample(shape=new_shape, extent=new_extent, method="nearest")
+    new_limits = [(0, 1), (0, 1)]
+    image = fixture_image.resample(shape=new_shape, limits=new_limits, method="nearest")
     assert image.shape == new_shape
-    assert image.extent == new_extent
+    assert image.limits[0].min == 0 and image.limits[0].max == 1
+    assert image.limits[1].min == 0 and image.limits[1].max == 1
 
 
 def test_square_pixels(fixture_image):
     """Tests the square_pixels method."""
-    assert fixture_image.pixel_width != fixture_image.pixel_height
+    assert fixture_image.pixel_size(0) != fixture_image.pixel_size(1)
     image = fixture_image.square_pixels()
-    assert image.pixel_width == image.pixel_height
+    assert image.pixel_size(0) == image.pixel_size(1)
 
 
 @pytest.mark.parametrize("shape", [(1, 100), (100, 1)])
-def test_size_one_nonzero_width(shape, fixture_extent):
+def test_size_one_nonzero_width(shape, fixture_limits):
     """Ensures that an error is raised when a dimension has size 1 but non-zero width."""
 
     with pytest.raises(ValueError):
-        Image(array=np.ones(shape), extent=fixture_extent)
+        Image(array=np.ones(shape), limits=fixture_limits)
 
 
 @pytest.mark.parametrize(
@@ -123,25 +127,26 @@ def test_getitem_slice(fixture_image, slice_x, slice_y):
     image = fixture_image[slice_x, slice_y]
     data_sliced_by_numpy = fixture_image.array[slice_x, slice_y].reshape(image.shape)
     assert np.allclose(image.array, data_sliced_by_numpy)
-    assert image.extent != fixture_image.extent
+    assert image.limits != fixture_image.limits
 
-    expected_extent = []
+    expected_limits = []
     for dim, key in enumerate((slice_x, slice_y)):
         if isinstance(key, int):
             continue
         coords = fixture_image.vals(dim)[key]
-        expected_extent.extend([coords[0], coords[-1]])
-    assert np.allclose(image.extent, Extent(expected_extent).sort())
+        expected_limits.append((coords[0], coords[-1]))
+    for dim, limits in enumerate(expected_limits):
+        assert np.allclose((image.limits[dim].min, image.limits[dim].max), sorted(limits))
 
 
-def test_extent_after_slicing():
-    """Tests the extent of an image after slicing."""
+def test_limits_after_slicing():
+    """Tests the limits of an image after slicing."""
     array = np.random.rand(101, 101)
-    extent = Extent((-5, 5, 0, 2))
-    image = Image(array=array, extent=extent)
+    limits = [(-5, 5), (0, 2)]
+    image = Image(array=array, limits=limits)
     image_sliced = image[0:51, 0:51]
-    print(image_sliced.extent)
-    assert image_sliced.extent == Extent((-5, 0, 0, 1))
+    assert image_sliced.limits[0].min == -5 and image_sliced.limits[0].max == 0
+    assert image_sliced.limits[1].min == 0 and image_sliced.limits[1].max == 1
 
 
 def test_save_hdf5(fixture_image_with_metadata, tmp_path):
@@ -149,8 +154,22 @@ def test_save_hdf5(fixture_image_with_metadata, tmp_path):
     fixture_image_with_metadata.save(tmp_path / "test.hdf5")
     image = Image.load(tmp_path / "test.hdf5")
     assert np.allclose(image.array, fixture_image_with_metadata.array)
-    assert image.extent == fixture_image_with_metadata.extent
+    assert image.limits == fixture_image_with_metadata.limits
     assert _dict_equal(image.metadata, fixture_image_with_metadata.metadata)
+
+
+def test_load_legacy_extent_format(tmp_path):
+    """Tests that HDF5 files written with the old 'extent' attribute still load."""
+    array = np.random.rand(10, 10)
+    path = tmp_path / "legacy.hdf5"
+    with h5py.File(path, "w") as dataset:
+        dataset.create_dataset("image", data=array)
+        dataset["image"].attrs["extent"] = np.array([-1.0, 1.0, 0.0, 3.0])
+
+    image = Image.load(path)
+    assert np.allclose(image.array, array)
+    assert image.limits[0].min == -1 and image.limits[0].max == 1
+    assert image.limits[1].min == 0 and image.limits[1].max == 3
 
 
 @pytest.mark.parametrize("suffix", [".png", ".jpg", ".jpeg", ".bmp"])
@@ -206,20 +225,20 @@ def test_grid(fixture_image):
     """Tests the grid method."""
     grid = fixture_image.grid
     assert grid.shape == (fixture_image.shape[0], fixture_image.shape[1], 2)
-    assert np.min(grid[:, :, 0]) == fixture_image.extent.x0
-    assert np.max(grid[:, :, 0]) == fixture_image.extent.x1
-    assert np.min(grid[:, :, 1]) == fixture_image.extent.y0
-    assert np.max(grid[:, :, 1]) == fixture_image.extent.y1
+    assert np.min(grid[:, :, 0]) == fixture_image.limits[0].min
+    assert np.max(grid[:, :, 0]) == fixture_image.limits[0].max
+    assert np.min(grid[:, :, 1]) == fixture_image.limits[1].min
+    assert np.max(grid[:, :, 1]) == fixture_image.limits[1].max
 
 
 def test_flatgrid(fixture_image):
     """Tests the flatgrid method."""
     flatgrid = fixture_image.flatgrid
     assert flatgrid.shape == (fixture_image.size, 2)
-    assert np.min(flatgrid[:, 0]) == fixture_image.extent.x0
-    assert np.max(flatgrid[:, 0]) == fixture_image.extent.x1
-    assert np.min(flatgrid[:, 1]) == fixture_image.extent.y0
-    assert np.max(flatgrid[:, 1]) == fixture_image.extent.y1
+    assert np.min(flatgrid[:, 0]) == fixture_image.limits[0].min
+    assert np.max(flatgrid[:, 0]) == fixture_image.limits[0].max
+    assert np.min(flatgrid[:, 1]) == fixture_image.limits[1].min
+    assert np.max(flatgrid[:, 1]) == fixture_image.limits[1].max
 
 
 def test_equal(fixture_image):
@@ -236,24 +255,16 @@ def test_transpose(fixture_image):
     assert fixture_image.transpose().transpose() == fixture_image
 
 
-def test_xflip(fixture_image):
-    """Tests the xflip method."""
-    image = fixture_image.xflip()
-    assert np.allclose(image.array, fixture_image.array[::-1, :])
-    # Flipping should not change the extent
-    assert image.extent == fixture_image.extent
+@pytest.mark.parametrize("dim", [0, 1])
+def test_flip(fixture_image, dim):
+    """Tests the flip method along each dimension."""
+    image = fixture_image.flip(dim)
+    expected = np.flip(fixture_image.array, axis=dim)
+    assert np.allclose(image.array, expected)
+    # Flipping should not change the limits
+    assert image.limits == fixture_image.limits
     # Flipping twice should return the original image
-    assert fixture_image.xflip().xflip() == fixture_image
-
-
-def test_yflip(fixture_image):
-    """Tests the yflip method."""
-    image = fixture_image.yflip()
-    assert np.allclose(image.array, fixture_image.array[:, ::-1])
-    # Flipping should not change the extent
-    assert image.extent == fixture_image.extent
-    # Flipping twice should return the original image
-    assert fixture_image.yflip().yflip() == fixture_image
+    assert fixture_image.flip(dim).flip(dim) == fixture_image
 
 
 def test_to_pixels(fixture_image):
@@ -271,8 +282,8 @@ def test_log_compress(fixture_image):
 
 
 def test_window(fixture_image):
-    """Existing Extent-based call still works."""
-    window = fixture_image.get_window(Extent((0, 1, 0, 1)))
+    """Tests the get_window method with the (min, max)-per-dimension format."""
+    window = fixture_image.get_window([(0, 1), (0, 1)])
     assert isinstance(window, Image)
 
 
@@ -290,15 +301,15 @@ def test_window_partial_dim1(fixture_image):
 
 def test_window_zero_dim_size():
     """No division by zero when a dimension has zero spatial size."""
-    img = Image(np.zeros((10, 1)), extent=(-1, 1, 0.5, 0.5))
+    img = Image(np.zeros((10, 1)), limits=[(-1, 1), (0.5, 0.5)])
     result = img.get_window([(-1, 0), (0.5, 0.5)])
     assert result is not None
 
 
 def test_coordinates_to_indices(fixture_image):
     """Tests the coordinates_to_indices method."""
-    x_coords = np.array([0.0, 0.5, fixture_image.extent.x1])
-    y_coords = np.array([1.0, 1.5, fixture_image.extent.y1])
+    x_coords = np.array([0.0, 0.5, fixture_image.limits[0].max])
+    y_coords = np.array([1.0, 1.5, fixture_image.limits[1].max])
     coordinates = np.stack((x_coords, y_coords), axis=1)
     indices = fixture_image.coordinates_to_indices(coordinates)
     print(indices)

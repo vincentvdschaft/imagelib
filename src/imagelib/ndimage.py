@@ -10,41 +10,26 @@ from scipy.ndimage import uniform_filter1d
 
 from .clahe import clahe
 from .dynamic_range import apply_dynamic_range_curve
-from .extent import Extent, LimitsND, compute_extent_after_slicing
+from .extent import Limits, LimitsND, LimitsNDInput, compute_limits_after_slicing
 from .match_histograms import match_histograms
 from .saving import load_hdf5_image, save_hdf5_image
 
 
 class NDImage:
     def __init__(
-        self, array, extent=None, metadata=None, labels=None, units=None, limits=None
+        self, array, limits: LimitsNDInput | None = None, metadata=None, labels=None, units=None
     ):
         self.array = np.asarray(array).copy()
         self.array.setflags(write=True)
-        if limits is not None:
-            self._limits: LimitsND = LimitsND(limits)
-        elif extent is not None:
-            self._limits: LimitsND = LimitsND.from_extent(Extent(extent))
-        else:
-            self._limits: LimitsND = LimitsND.from_shape(array.shape)
+        self._limits = (
+            LimitsND(limits) if limits is not None else LimitsND.from_shape(self.array.shape)
+        )
+        _check_ndimage_initializers(self.array, self._limits)
         self._metadata = {}
         self._labels = self._get_initialized_labels(labels)
         self._units = units if units is not None else ()
         if metadata is not None:
             self.update_metadata(metadata)
-
-    @staticmethod
-    def _extent_from_array(array) -> Extent:
-        ndim = array.ndim
-        extent_initializer = []
-        for dim in range(ndim):
-            extent_initializer.append(0)
-            extent_initializer.append(array.shape[dim] - 1)
-        return Extent(extent_initializer)
-
-    @property
-    def extent(self) -> Extent:
-        return self._limits.to_extent()
 
     @property
     def limits(self) -> LimitsND:
@@ -59,7 +44,7 @@ class NDImage:
         return self._units
 
     def __repr__(self) -> str:
-        return f"NDImage(array={self.shape}, extent={self.extent!r})"
+        return f"NDImage(array={self.shape}, limits={self.limits!r})"
 
     def _get_initialized_labels(self, labels=None) -> tuple:
         if labels is not None:
@@ -97,7 +82,7 @@ class NDImage:
 
         # if result is an ndarray (not scalar), wrap it back
         if isinstance(result, np.ndarray):
-            return NDImage(result, self.extent, metadata=self.metadata)
+            return NDImage(result, self.limits, metadata=self.metadata)
         else:
             return result
 
@@ -110,7 +95,7 @@ class NDImage:
         if func is np.concatenate:
             arrays = [a.array for a in args[0]]
             new_array = np.concatenate(arrays, **kwargs)
-            return NDImage(new_array, self.extent, metadata=self.metadata)
+            return NDImage(new_array, self.limits, metadata=self.metadata)
         return NotImplemented
 
     # ==========================================================================
@@ -136,9 +121,12 @@ class NDImage:
             return np.where(self.pixel_sizes > 0, self.pixel_sizes, 1e-6)
 
     @property
-    def extent_imshow(self) -> Extent:
-        """Returns the extent adjusted for imshow."""
-        return get_extent_imshow(self.limits, self.shape)
+    def extent_imshow(self) -> tuple:
+        """Returns the (x0, x1, y0, y1) extent for use with matplotlib's imshow.
+
+        Uses the last two dimensions, which are the (y, x) image-plane axes.
+        """
+        return get_limits_imshow(self.limits, self.shape)
 
     # ==========================================================================
     # Forward properties
@@ -207,21 +195,8 @@ class NDImage:
     # ==========================================================================
     def vals(self, dim) -> np.ndarray:
         """Returns the coordinate values along the given dimension."""
-        return np.linspace(
-            self.extent.start(dim), self.extent.end(dim), self.shape[dim]
-        )
-
-    def x_vals(self) -> np.ndarray:
-        """Returns the x coordinate values."""
-        return self.vals(0)
-
-    def y_vals(self) -> np.ndarray:
-        """Returns the y coordinate values."""
-        return self.vals(1)
-
-    def z_vals(self) -> np.ndarray:
-        """Returns the z coordinate values."""
-        return self.vals(2)
+        dim_limits = self.limits[dim]
+        return np.linspace(dim_limits.min, dim_limits.max, self.shape[dim])
 
     @property
     def grid(self) -> np.ndarray:
@@ -239,8 +214,8 @@ class NDImage:
     def __getitem__(self, key) -> NDImage:
         """Slicing the image."""
         new_array = self.array[key]
-        new_extent = compute_extent_after_slicing(self.shape, self.extent, key)
-        return NDImage(new_array, new_extent, metadata=self.metadata)
+        new_limits = compute_limits_after_slicing(self.shape, self.limits, key)
+        return NDImage(new_array, new_limits, metadata=self.metadata)
 
     def __setitem__(self, key, value) -> None:
         self.array[key] = value
@@ -259,7 +234,7 @@ class NDImage:
         save_hdf5_image(
             path=path,
             array=self.array,
-            extent=self.extent,
+            limits=self.limits,
             metadata=self.metadata,
         )
         return self
@@ -272,10 +247,10 @@ class NDImage:
         return load_hdf5_image(path, indices=indices)
 
     def with_array(self, array) -> NDImage:
-        return NDImage(array, extent=self.extent, metadata=self.metadata)
+        return NDImage(array, limits=self.limits, metadata=self.metadata)
 
-    def with_extent(self, extent) -> NDImage:
-        return NDImage(self.array, extent=extent, metadata=self.metadata)
+    def with_limits(self, limits: LimitsNDInput | None) -> NDImage:
+        return NDImage(self.array, limits=limits, metadata=self.metadata)
 
     def map_range(self, new_min, new_max, old_min=None, old_max=None) -> NDImage:
         """Map the image values to a new range [new_min, new_max]."""
@@ -285,7 +260,7 @@ class NDImage:
             old_max = np.max(self.array)
         scaled = (self.array - old_min) / (old_max - old_min)
         mapped = scaled * (new_max - new_min) + new_min
-        return NDImage(mapped, self.extent, metadata=self.metadata)
+        return NDImage(mapped, self.limits, metadata=self.metadata)
 
     def to_pixels(self) -> NDImage:
         """Convert the image to pixel values in the range [0, 1]."""
@@ -294,16 +269,14 @@ class NDImage:
     def clip(self, min=None, max=None) -> NDImage:
         """Clip the image values to the given range."""
         return NDImage(
-            np.clip(self.array, min, max), self.extent, metadata=self.metadata
+            np.clip(self.array, min, max), self.limits, metadata=self.metadata
         )
 
-    def resample(self, shape, extent=None, method="linear", fill_value=0) -> NDImage:
+    def resample(
+        self, shape, limits: LimitsNDInput | None = None, method="linear", fill_value=0
+    ) -> NDImage:
         """Resample image to a new shape."""
-
-        if extent is None:
-            extent = self.extent
-        else:
-            extent = Extent(extent)
+        limits = LimitsND(limits) if limits is not None else self.limits
 
         all_vals = [self.vals(dim) for dim in range(self.ndim)]
 
@@ -315,7 +288,7 @@ class NDImage:
             method=method,
         )
         new_all_vals = [
-            np.linspace(extent.start(dim), extent.end(dim), shape[dim])
+            np.linspace(limits[dim].min, limits[dim].max, shape[dim])
             for dim in range(len(shape))
         ]
 
@@ -325,7 +298,7 @@ class NDImage:
 
         return NDImage(
             new_data,
-            extent=extent,
+            limits=limits,
             metadata=self.metadata,
         )
 
@@ -334,31 +307,32 @@ class NDImage:
         if axes is None:
             axes = list(reversed(range(self.ndim)))
         new_array = np.transpose(self.array, axes)
-        new_extent_initializer = []
-        for axis in axes:
-            new_extent_initializer.append(self.extent.start(axis))
-            new_extent_initializer.append(self.extent.end(axis))
-        new_extent = Extent(new_extent_initializer)
-        return NDImage(new_array, extent=new_extent, metadata=self.metadata)
+        new_limits = LimitsND([self.limits[axis] for axis in axes])
+        return NDImage(new_array, limits=new_limits, metadata=self.metadata)
+
+    def flip(self, dim) -> NDImage:
+        """Returns a copy of the image flipped along the given dimension."""
+        key = [slice(None)] * self.ndim
+        key[dim] = slice(None, None, -1)
+        return self[tuple(key)]
 
     def square_pixels(self) -> NDImage:
-        nonzero_pixel_sizes = [
-            size for size in filter(lambda size: size > 0, self.pixel_sizes)
-        ]
-        new_pixel_size = min(nonzero_pixel_sizes)
+        """Resample so that all dimensions share the smallest pixel size."""
+        new_pixel_size = min(size for size in self.pixel_sizes if size > 0)
+        new_shape, new_limits = self._square_pixel_geometry(new_pixel_size)
+        return self.resample(shape=new_shape, limits=new_limits, method="nearest")
 
-        new_extent_initializer = []
+    def _square_pixel_geometry(self, pixel_size) -> tuple[list, LimitsND]:
         new_shape = []
+        new_limits = []
         for dim in range(self.ndim):
-            new_n_pixels = int(self.extent.dim_size(dim) / new_pixel_size) + 1
-            new_shape.append(new_n_pixels)
-
-            new_extent_initializer.append(self.extent.start(dim))
-            new_extent_initializer.append(
-                self.extent.start(dim) + (new_n_pixels - 1) * new_pixel_size
+            dim_limits = self.limits[dim]
+            n_pixels = int(dim_limits.size() / pixel_size) + 1
+            new_shape.append(n_pixels)
+            new_limits.append(
+                Limits(dim_limits.min, dim_limits.min + (n_pixels - 1) * pixel_size)
             )
-        new_extent = Extent(new_extent_initializer)
-        return self.resample(shape=new_shape, extent=new_extent, method="nearest")
+        return new_shape, LimitsND(new_limits)
 
     def resample_scale(self, factor, axes=None) -> NDImage:
         """Scale the image by a given factor."""
@@ -369,50 +343,49 @@ class NDImage:
             max(1, int(dim_size * factor_for_dim))
             for dim_size, factor_for_dim in zip(self.shape, factors)
         ]
-        new_extent = _collapse_extent_for_single_element_dims(self.extent, new_shape)
-        return self.resample(shape=new_shape, extent=new_extent, method="linear")
+        new_limits = _collapse_limits_for_single_element_dims(self.limits, new_shape)
+        return self.resample(shape=new_shape, limits=new_limits, method="linear")
 
-    def get_window(self, extent: Extent) -> NDImage:
-        """Returns a new image that contains only the pixels in the window.
+    def get_window(self, limits) -> NDImage:
+        """Returns a new image restricted to a physical-coordinate window.
 
         Args:
-            extent: The extent of the window to extract (in the image units, not pixel indices).
+            limits: One entry per dimension, each either a (min, max) pair
+                (in image units, not pixel indices) or None to leave that
+                dimension unchanged.
         """
-        extent = Extent(extent)
+        assert len(limits) == self.ndim, "limits must have one entry per dimension."
+        slices = tuple(
+            self._window_slice(dim, entry) for dim, entry in enumerate(limits)
+        )
+        return self[slices]
 
-        assert extent.ndim == self.ndim, (
-            "The extent must have the same number of dimensions as the image."
-            f"Got {extent.ndim} and {self.ndim}."
+    def _window_slice(self, dim, entry) -> slice:
+        if entry is None:
+            return slice(None)
+        low, high = entry
+        return slice(
+            self._coordinate_to_clipped_index(dim, low),
+            self._coordinate_to_clipped_index(dim, high),
         )
 
-        slices = []
-
-        for dim in range(self.ndim):
-            limits = []
-            for limit in (extent.start(dim), extent.end(dim)):
-                index = int(
-                    np.ceil(
-                        (limit - self.extent.start(dim))
-                        / self.extent.dim_size(dim)
-                        * (self.shape[dim] - 1)
-                    )
-                )
-                limit = np.clip(index, 0, self.shape[dim])
-                limits.append(limit)
-            slices.append(slice(*limits))
-
-        return self[tuple(slices)]
+    def _coordinate_to_clipped_index(self, dim, coordinate) -> int:
+        dim_limits = self.limits[dim]
+        size = dim_limits.size() or 1
+        fraction = (coordinate - dim_limits.min) / size
+        index = int(np.ceil(fraction * (self.shape[dim] - 1)))
+        return int(np.clip(index, 0, self.shape[dim]))
 
     def match_histogram(self, other) -> NDImage:
         """Match the histogram of the image to another image."""
 
         array = match_histograms(self.array, other.array)
-        return NDImage(array, extent=self.extent, metadata=self.metadata)
+        return NDImage(array, limits=self.limits, metadata=self.metadata)
 
     def apply_dynamic_range_curve(self, curve: np.ndarray) -> NDImage:
         """Apply a dynamic range curve to the image data."""
         data = apply_dynamic_range_curve(curve, self.array)
-        return NDImage(data, extent=self.extent, metadata=self.metadata)
+        return NDImage(data, limits=self.limits, metadata=self.metadata)
 
     def log_compress(self) -> NDImage:
         """Log-compress image data with 20*log10(image)."""
@@ -420,7 +393,7 @@ class NDImage:
         data = np.where(self.array > 0, self.array, 1e-12)
         data = 20 * np.log10(data)
 
-        return NDImage(data, extent=self.extent, metadata=self.metadata)
+        return NDImage(data, limits=self.limits, metadata=self.metadata)
 
     def log_expand(self) -> NDImage:
         """Log-expand image data."""
@@ -440,7 +413,7 @@ class NDImage:
             self.array,
         )
 
-        return NDImage(data, extent=self.extent, metadata=self.metadata)
+        return NDImage(data, limits=self.limits, metadata=self.metadata)
 
     def symlog_expand(self, threshold=1.0) -> NDImage:
         """Symmetric log-expand image data."""
@@ -485,7 +458,7 @@ class NDImage:
 
     def copy(self) -> NDImage:
         """Returns a copy of the image."""
-        return NDImage(self.array.copy(), self.extent, metadata=self.metadata.copy())
+        return NDImage(self.array.copy(), self.limits, metadata=self.metadata.copy())
 
     def max(self, **kwargs) -> float:
         """Returns the maximum value of the image."""
@@ -499,24 +472,16 @@ class NDImage:
         """Returns the mean value of the image."""
         return np.mean(self.array, **kwargs)
 
-    def xflip(self) -> NDImage:
-        """Returns a copy of the image flipped in the x direction."""
-        return self[::-1, :]
-
-    def yflip(self) -> NDImage:
-        """Returns a copy of the image flipped in the y direction."""
-        return self[:, ::-1]
-
     def fft(self, axes=None) -> NDImage:
         """Returns the FFT of the image.
 
         The spectrum is shifted so that the zero frequency component is in the center
         of the spectrum.
 
-        The extent is updated to reflect the spatial frequency range."""
+        The limits are updated to reflect the spatial frequency range."""
         data = np.fft.fftn(self.array, axes=axes)
 
-        new_extent = list(self.extent)
+        new_limits = list(self.limits.limits)
 
         for axis in axes or range(self.ndim):
             data = np.fft.fftshift(data, axes=axis)
@@ -524,11 +489,9 @@ class NDImage:
             spatial_freqs = np.fft.fftfreq(
                 self.shape[axis], d=spatial_sampling_interval
             )
+            new_limits[axis] = Limits(np.min(spatial_freqs), np.max(spatial_freqs))
 
-            new_extent[2 * axis] = np.min(spatial_freqs)
-            new_extent[2 * axis + 1] = np.max(spatial_freqs)
-
-        return NDImage(data, extent=new_extent, metadata=self.metadata)
+        return NDImage(data, limits=LimitsND(new_limits), metadata=self.metadata)
 
     def moving_average(self, ax, window_size) -> NDImage:
         """Apply a moving average filter along the given axis."""
@@ -569,7 +532,7 @@ class NDImage:
         assert coordinates.shape[1] == self.ndim
         indices_total = []
         for dim in range(self.ndim):
-            indices = (coordinates[:, dim] - self.extent.start(dim)) / self.pixel_size(
+            indices = (coordinates[:, dim] - self.limits[dim].min) / self.pixel_size(
                 dim
             )
             indices_rounded = np.round(indices).astype(int)
@@ -593,7 +556,7 @@ class NDImage:
         coords = []
         for dim in range(self.ndim):
             coords.append(
-                self.extent.start(dim) + indices[:, dim] * self.pixel_size(dim)
+                self.limits[dim].min + indices[:, dim] * self.pixel_size(dim)
             )
         return np.stack(coords, axis=-1)
 
@@ -607,7 +570,7 @@ class NDImage:
         if self.ndim < 2:
             raise ValueError("CLAHE requires at least 2D images.")
         data = clahe(self.array, clip_limit=clip_limit, tile_grid_size=tile_grid_size)
-        return NDImage(data, extent=self.extent, metadata=self.metadata)
+        return NDImage(data, limits=self.limits, metadata=self.metadata)
 
     # ==========================================================================
     # Dunder methods
@@ -617,16 +580,16 @@ class NDImage:
         """Add two images together."""
         if isinstance(other, (int, float, np.number)):
             data = self.array + other
-            return NDImage(data, extent=self.extent, metadata=self.metadata)
+            return NDImage(data, limits=self.limits, metadata=self.metadata)
 
         if isinstance(other, NDImage):
-            assert all([e1 == e2 for e1, e2 in zip(self.extent, other.extent)])
+            assert self.limits == other.limits
             data = self.array + other.array
-            return NDImage(data, extent=self.extent, metadata=self.metadata)
+            return NDImage(data, limits=self.limits, metadata=self.metadata)
 
         other = np.array(other)
         data = self.array + other
-        return NDImage(data, extent=self.extent, metadata=self.metadata)
+        return NDImage(data, limits=self.limits, metadata=self.metadata)
 
     def __mul__(self, other) -> NDImage:
         """Multiply image."""
@@ -634,7 +597,7 @@ class NDImage:
             other = other.array
 
         data = self.array * other
-        return NDImage(data, extent=self.extent, metadata=self.metadata)
+        return NDImage(data, limits=self.limits, metadata=self.metadata)
 
     def __rmul__(self, other) -> NDImage:
         """Multiply image."""
@@ -646,7 +609,7 @@ class NDImage:
             other = other.array
 
         data = self.array / other
-        return NDImage(data, extent=self.extent, metadata=self.metadata)
+        return NDImage(data, limits=self.limits, metadata=self.metadata)
 
     def __sub__(self, other) -> NDImage:
         """Subtract two images."""
@@ -657,7 +620,7 @@ class NDImage:
         if not isinstance(other, NDImage):
             return False
 
-        if self.extent != other.extent:
+        if self.limits != other.limits:
             return False
 
         return np.allclose(self.array, other.array)
@@ -666,38 +629,36 @@ class NDImage:
     def test_image(cls) -> NDImage:
         """Returns a test image."""
 
-        extent = Extent((-10, 0, 0, 20))
-        x_vals = np.linspace(extent.start(0), extent.end(0), 128)
-        y_vals = np.linspace(extent.start(1), extent.end(1), 256)
-        x_grid, y_grid = np.meshgrid(x_vals, y_vals, indexing="ij")
+        limits = LimitsND([(-10, 0), (0, 20)])
+        dim0_vals = np.linspace(limits[0].min, limits[0].max, 128)
+        dim1_vals = np.linspace(limits[1].min, limits[1].max, 256)
+        grid0, grid1 = np.meshgrid(dim0_vals, dim1_vals, indexing="ij")
         array = (
-            np.exp(-((x_grid + 5) ** 2 + (y_grid - 10) ** 2) / 20)
-            * np.sin(2 * np.pi * x_grid)
-            * np.cos(2 * np.pi * y_grid * 2)
+            np.exp(-((grid0 + 5) ** 2 + (grid1 - 10) ** 2) / 20)
+            * np.sin(2 * np.pi * grid0)
+            * np.cos(2 * np.pi * grid1 * 2)
         )
-        return NDImage(array, extent=extent)
+        return NDImage(array, limits=limits)
 
     @classmethod
-    def from_png(cls, path, extent=None) -> NDImage:
+    def from_png(cls, path, limits: LimitsNDInput | None = None) -> NDImage:
         """Load image from PNG file."""
         array = np.mean(matplotlib.image.imread(path), axis=2).T  # convert to grayscale
-        if extent is None:
-            extent = Extent((0, array.shape[0] - 1, 0, array.shape[1] - 1))
-        return NDImage(array, extent=extent)
+        return NDImage(array, limits=limits)
 
 
 # ==============================================================================
 # Helper functions
 # ==============================================================================
-def _collapse_extent_for_single_element_dims(extent: Extent, shape) -> Extent:
-    new_initializer = []
-    for dim in range(extent.ndim):
+def _collapse_limits_for_single_element_dims(limits: LimitsND, shape) -> LimitsND:
+    new_limits = []
+    for dim, dim_limits in enumerate(limits):
         if shape[dim] == 1:
-            center = (extent.start(dim) + extent.end(dim)) / 2
-            new_initializer.extend([center, center])
+            center = (dim_limits.min + dim_limits.max) / 2
+            new_limits.append(Limits(center, center))
         else:
-            new_initializer.extend([extent.start(dim), extent.end(dim)])
-    return Extent(new_initializer)
+            new_limits.append(dim_limits)
+    return LimitsND(new_limits)
 
 
 def _check_ndimage_initializers(array: np.ndarray, limits: LimitsND):
@@ -712,31 +673,21 @@ def _check_ndimage_initializers(array: np.ndarray, limits: LimitsND):
             )
 
 
-def get_extent_imshow(limits: LimitsND, shape: tuple) -> Extent:
-    """Compute the extent for imshow based on limits and shape.
+def get_limits_imshow(limits: LimitsND, shape: tuple) -> tuple:
+    """Compute the (x0, x1, y0, y1) extent for matplotlib's imshow.
 
-    Args:
-        limits: The limits in order y, x.
-        shape: The shape of the image in order y, x.
-
-    Returns:
-        Extent: The extent for imshow [x0, x1, y0, y1].
+    Uses the last two dimensions of `limits`/`shape`, the (y, x) image-plane
+    axes under the zyx convention.
     """
-    extent = []
-    for n_pixels, limits in zip(shape, limits):
-        pixel_size = limits.size() / (n_pixels - 1) if n_pixels > 1 else 0.0
-        extent.append(limits.min - pixel_size / 2)
-        extent.append(limits.max + pixel_size / 2)
-    return Extent(extent)
+    y_edges = _padded_edges(limits[-2], shape[-2])
+    x_edges = _padded_edges(limits[-1], shape[-1])
+    return (*x_edges, *y_edges)
 
 
-def correct_extent_for_imshow(extent: Extent, shape):
-    new_initializer = []
-    for dim in range(extent.ndim):
-        pixel_size = extent.dim_size(dim) / (shape[dim] - 1) if shape[dim] > 1 else 0.0
-        new_initializer.append(extent.start(dim) - pixel_size / 2)
-        new_initializer.append(extent.end(dim) + pixel_size / 2)
-    return Extent(new_initializer)
+def _padded_edges(dim_limits: Limits, n_pixels: int) -> tuple:
+    """Return (min, max) padded by half a pixel on each side."""
+    pixel_size = dim_limits.size() / (n_pixels - 1) if n_pixels > 1 else 0.0
+    return dim_limits.min - pixel_size / 2, dim_limits.max + pixel_size / 2
 
 
 def compute_pixel_sizes(limits: LimitsND, shape) -> np.ndarray:

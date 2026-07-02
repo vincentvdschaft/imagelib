@@ -93,8 +93,8 @@ def _check_input_fourier_shell_correlation(
         raise TypeError("image2 must be an instance of Image")
     if image1.shape != image2.shape:
         raise ValueError("Images must have the same shape")
-    if image1.extent != image2.extent:
-        raise ValueError("Images must have the same extent")
+    if image1.limits != image2.limits:
+        raise ValueError("Images must have the same limits")
     if not isinstance(num_shells, int) or num_shells <= 0:
         raise ValueError("num_shells must be a positive integer")
 
