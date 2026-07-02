@@ -5,13 +5,19 @@ from imagelib import Image
 
 im = Image(
     np.arange(4 * 4).reshape(4, 4),
-    labels=("x", "y"),
+    labels=("y", "x"),
     units=("mm", "mm"),
-    limits=((0, 3), (0, 3)),
-).T
+    limits=((0, 6), (0, 3)),
+)
 
-plt.imshow(im.array, extent=im.extent_imshow, origin="lower", cmap="viridis")
-plt.xlabel(f"{im.labels[0]} [{im.units[0]}]")
-plt.ylabel(f"{im.labels[1]} [{im.units[1]}]")
+fig, axes = plt.subplots(1, 2)
+
+im2 = im.T
+
+for ax, im in zip(axes, [im, im2]):
+    ax.imshow(im.array, extent=im.extent_imshow, origin="lower", cmap="viridis")
+    ax.set_xlabel(f"{im.labels[-1]} [{im.units[-1]}]")
+    ax.set_ylabel(f"{im.labels[-2]} [{im.units[-2]}]")
+
 
 plt.show()

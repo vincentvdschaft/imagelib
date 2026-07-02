@@ -4,10 +4,16 @@ from pathlib import Path
 import h5py
 import numpy as np
 
-from .extent import Extent, LimitsND, LimitsNDInput, compute_limits_after_slicing
+from .extent import (
+    Extent,
+    LimitsND,
+    LimitsNDInput,
+    compute_limits_after_slicing,
+    select_axis_values_after_slicing,
+)
 
 
-def save_hdf5_image(path, array, limits: LimitsNDInput, metadata=None):
+def save_hdf5_image(path, array, limits: LimitsNDInput, metadata=None, labels=None, units=None):
     """
     Saves an image to an hdf5 file.
 
@@ -21,6 +27,10 @@ def save_hdf5_image(path, array, limits: LimitsNDInput, metadata=None):
         The spatial limits of the image, one (min, max) pair per dimension.
     metadata : dict
         Additional metadata to save.
+    labels : sequence of str
+        Per-dimension axis labels.
+    units : sequence of str
+        Per-dimension axis units.
     """
 
     limits = LimitsND(limits)
@@ -35,6 +45,10 @@ def save_hdf5_image(path, array, limits: LimitsNDInput, metadata=None):
     with h5py.File(path, "w") as dataset:
         dataset.create_dataset("image", data=array)
         dataset["image"].attrs["limits"] = _limits_to_array(limits)
+        if labels is not None:
+            dataset["image"].attrs["labels"] = list(labels)
+        if units is not None:
+            dataset["image"].attrs["units"] = list(units)
         if metadata is not None:
             save_dict_to_hdf5(dataset, metadata)
 
@@ -66,17 +80,21 @@ def load_hdf5_image(path, indices=slice(None)):
     """
 
     with h5py.File(path, "r") as dataset:
+        attrs = dataset["image"].attrs
         original_shape = dataset["image"].shape
         array = dataset["image"][indices]
-        limits = _read_limits(dataset["image"].attrs)
         limits = compute_limits_after_slicing(
-            current_shape=original_shape, limits=limits, key=indices
+            current_shape=original_shape, limits=_read_limits(attrs), key=indices
         )
+        labels = _read_axis_metadata(attrs, "labels", indices)
+        units = _read_axis_metadata(attrs, "units", indices)
         metadata = load_hdf5_to_dict(dataset)
         metadata.pop("image", None)
     from .ndimage import NDImage
 
-    return NDImage(array=array, limits=limits, metadata=metadata)
+    return NDImage(
+        array=array, limits=limits, metadata=metadata, labels=labels, units=units
+    )
 
 
 def _read_limits(attrs) -> LimitsND:
@@ -84,6 +102,14 @@ def _read_limits(attrs) -> LimitsND:
     if "limits" in attrs:
         return LimitsND(np.asarray(attrs["limits"]))
     return LimitsND.from_extent(Extent(attrs["extent"]))
+
+
+def _read_axis_metadata(attrs, name, indices):
+    """Reads a per-axis string attribute and restructures it for the slice."""
+    if name not in attrs:
+        return None
+    values = [str(value) for value in attrs[name]]
+    return select_axis_values_after_slicing(values, indices, "")
 
 
 def save_dict_to_hdf5(hdf5_file, data_dict, parent_group="/"):

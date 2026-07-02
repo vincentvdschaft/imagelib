@@ -10,7 +10,13 @@ from scipy.ndimage import uniform_filter1d
 
 from .clahe import clahe
 from .dynamic_range import apply_dynamic_range_curve
-from .extent import Limits, LimitsND, LimitsNDInput, compute_limits_after_slicing
+from .extent import (
+    Limits,
+    LimitsND,
+    LimitsNDInput,
+    compute_limits_after_slicing,
+    select_axis_values_after_slicing,
+)
 from .match_histograms import match_histograms
 from .saving import load_hdf5_image, save_hdf5_image
 
@@ -27,7 +33,7 @@ class NDImage:
         _check_ndimage_initializers(self.array, self._limits)
         self._metadata = {}
         self._labels = self._get_initialized_labels(labels)
-        self._units = units if units is not None else ()
+        self._units = self._get_initialized_units(units)
         if metadata is not None:
             self.update_metadata(metadata)
 
@@ -44,7 +50,10 @@ class NDImage:
         return self._units
 
     def __repr__(self) -> str:
-        return f"NDImage(array={self.shape}, limits={self.limits!r})"
+        return (
+            f"NDImage(array={self.shape}, limits={self.limits!r}, "
+            f"labels={self.labels}, units={self.units})"
+        )
 
     def _get_initialized_labels(self, labels=None) -> tuple:
         if labels is not None:
@@ -59,6 +68,15 @@ class NDImage:
         if self.ndim > 1:
             labels[-2] = "y"
         return tuple(labels)
+
+    def _get_initialized_units(self, units=None) -> tuple:
+        if units is None:
+            return tuple("" for _ in range(self.ndim))
+        assert len(units) == self.ndim, (
+            "The number of units must match the number of dimensions. "
+            f"Got {len(units)} and {self.ndim}."
+        )
+        return tuple(units)
 
     # ==========================================================================
     # Numpy array interface
@@ -82,7 +100,7 @@ class NDImage:
 
         # if result is an ndarray (not scalar), wrap it back
         if isinstance(result, np.ndarray):
-            return NDImage(result, self.limits, metadata=self.metadata)
+            return self.with_array(result)
         else:
             return result
 
@@ -95,7 +113,7 @@ class NDImage:
         if func is np.concatenate:
             arrays = [a.array for a in args[0]]
             new_array = np.concatenate(arrays, **kwargs)
-            return NDImage(new_array, self.limits, metadata=self.metadata)
+            return self.with_array(new_array)
         return NotImplemented
 
     # ==========================================================================
@@ -215,7 +233,20 @@ class NDImage:
         """Slicing the image."""
         new_array = self.array[key]
         new_limits = compute_limits_after_slicing(self.shape, self.limits, key)
-        return NDImage(new_array, new_limits, metadata=self.metadata)
+        new_labels, new_units = self._axis_metadata_after_slicing(key)
+        return NDImage(
+            new_array,
+            new_limits,
+            metadata=self.metadata,
+            labels=new_labels,
+            units=new_units,
+        )
+
+    def _axis_metadata_after_slicing(self, key) -> tuple:
+        """Propagate per-axis labels and units through a numpy-style index key."""
+        labels = select_axis_values_after_slicing(self._labels, key, "")
+        units = select_axis_values_after_slicing(self._units, key, "")
+        return labels, units
 
     def __setitem__(self, key, value) -> None:
         self.array[key] = value
@@ -236,6 +267,8 @@ class NDImage:
             array=self.array,
             limits=self.limits,
             metadata=self.metadata,
+            labels=self.labels,
+            units=self.units,
         )
         return self
 
@@ -246,11 +279,25 @@ class NDImage:
         assert path.suffix == ".hdf5", "File must be HDF5 format."
         return load_hdf5_image(path, indices=indices)
 
+    def _rewrap(self, array, limits: LimitsNDInput | None = None) -> NDImage:
+        """Create a new image carrying this image's metadata, labels and units.
+
+        For operations that keep the number and order of dimensions. `limits`
+        defaults to the current limits.
+        """
+        return NDImage(
+            array,
+            limits=self.limits if limits is None else limits,
+            metadata=self.metadata,
+            labels=self.labels,
+            units=self.units,
+        )
+
     def with_array(self, array) -> NDImage:
-        return NDImage(array, limits=self.limits, metadata=self.metadata)
+        return self._rewrap(array)
 
     def with_limits(self, limits: LimitsNDInput | None) -> NDImage:
-        return NDImage(self.array, limits=limits, metadata=self.metadata)
+        return self._rewrap(self.array, limits)
 
     def map_range(self, new_min, new_max, old_min=None, old_max=None) -> NDImage:
         """Map the image values to a new range [new_min, new_max]."""
@@ -260,7 +307,7 @@ class NDImage:
             old_max = np.max(self.array)
         scaled = (self.array - old_min) / (old_max - old_min)
         mapped = scaled * (new_max - new_min) + new_min
-        return NDImage(mapped, self.limits, metadata=self.metadata)
+        return self.with_array(mapped)
 
     def to_pixels(self) -> NDImage:
         """Convert the image to pixel values in the range [0, 1]."""
@@ -268,9 +315,7 @@ class NDImage:
 
     def clip(self, min=None, max=None) -> NDImage:
         """Clip the image values to the given range."""
-        return NDImage(
-            np.clip(self.array, min, max), self.limits, metadata=self.metadata
-        )
+        return self.with_array(np.clip(self.array, min, max))
 
     def resample(
         self, shape, limits: LimitsNDInput | None = None, method="linear", fill_value=0
@@ -296,11 +341,7 @@ class NDImage:
             shape
         )
 
-        return NDImage(
-            new_data,
-            limits=limits,
-            metadata=self.metadata,
-        )
+        return self._rewrap(new_data, limits)
 
     def transpose(self, axes=None) -> NDImage:
         """Transpose the image."""
@@ -308,7 +349,15 @@ class NDImage:
             axes = list(reversed(range(self.ndim)))
         new_array = np.transpose(self.array, axes)
         new_limits = LimitsND([self.limits[axis] for axis in axes])
-        return NDImage(new_array, limits=new_limits, metadata=self.metadata)
+        new_labels = tuple(self._labels[axis] for axis in axes)
+        new_units = tuple(self._units[axis] for axis in axes)
+        return NDImage(
+            new_array,
+            limits=new_limits,
+            metadata=self.metadata,
+            labels=new_labels,
+            units=new_units,
+        )
 
     def flip(self, dim) -> NDImage:
         """Returns a copy of the image flipped along the given dimension."""
@@ -380,12 +429,12 @@ class NDImage:
         """Match the histogram of the image to another image."""
 
         array = match_histograms(self.array, other.array)
-        return NDImage(array, limits=self.limits, metadata=self.metadata)
+        return self.with_array(array)
 
     def apply_dynamic_range_curve(self, curve: np.ndarray) -> NDImage:
         """Apply a dynamic range curve to the image data."""
         data = apply_dynamic_range_curve(curve, self.array)
-        return NDImage(data, limits=self.limits, metadata=self.metadata)
+        return self.with_array(data)
 
     def log_compress(self) -> NDImage:
         """Log-compress image data with 20*log10(image)."""
@@ -393,7 +442,7 @@ class NDImage:
         data = np.where(self.array > 0, self.array, 1e-12)
         data = 20 * np.log10(data)
 
-        return NDImage(data, limits=self.limits, metadata=self.metadata)
+        return self.with_array(data)
 
     def log_expand(self) -> NDImage:
         """Log-expand image data."""
@@ -413,7 +462,7 @@ class NDImage:
             self.array,
         )
 
-        return NDImage(data, limits=self.limits, metadata=self.metadata)
+        return self.with_array(data)
 
     def symlog_expand(self, threshold=1.0) -> NDImage:
         """Symmetric log-expand image data."""
@@ -458,7 +507,7 @@ class NDImage:
 
     def copy(self) -> NDImage:
         """Returns a copy of the image."""
-        return NDImage(self.array.copy(), self.limits, metadata=self.metadata.copy())
+        return self._rewrap(self.array.copy())
 
     def max(self, **kwargs) -> float:
         """Returns the maximum value of the image."""
@@ -491,7 +540,7 @@ class NDImage:
             )
             new_limits[axis] = Limits(np.min(spatial_freqs), np.max(spatial_freqs))
 
-        return NDImage(data, limits=LimitsND(new_limits), metadata=self.metadata)
+        return self._rewrap(data, LimitsND(new_limits))
 
     def moving_average(self, ax, window_size) -> NDImage:
         """Apply a moving average filter along the given axis."""
@@ -570,7 +619,7 @@ class NDImage:
         if self.ndim < 2:
             raise ValueError("CLAHE requires at least 2D images.")
         data = clahe(self.array, clip_limit=clip_limit, tile_grid_size=tile_grid_size)
-        return NDImage(data, limits=self.limits, metadata=self.metadata)
+        return self.with_array(data)
 
     # ==========================================================================
     # Dunder methods
@@ -579,25 +628,20 @@ class NDImage:
     def __add__(self, other) -> NDImage:
         """Add two images together."""
         if isinstance(other, (int, float, np.number)):
-            data = self.array + other
-            return NDImage(data, limits=self.limits, metadata=self.metadata)
+            return self.with_array(self.array + other)
 
         if isinstance(other, NDImage):
             assert self.limits == other.limits
-            data = self.array + other.array
-            return NDImage(data, limits=self.limits, metadata=self.metadata)
+            return self.with_array(self.array + other.array)
 
-        other = np.array(other)
-        data = self.array + other
-        return NDImage(data, limits=self.limits, metadata=self.metadata)
+        return self.with_array(self.array + np.array(other))
 
     def __mul__(self, other) -> NDImage:
         """Multiply image."""
         if isinstance(other, NDImage):
             other = other.array
 
-        data = self.array * other
-        return NDImage(data, limits=self.limits, metadata=self.metadata)
+        return self.with_array(self.array * other)
 
     def __rmul__(self, other) -> NDImage:
         """Multiply image."""
@@ -608,8 +652,7 @@ class NDImage:
         if isinstance(other, NDImage):
             other = other.array
 
-        data = self.array / other
-        return NDImage(data, limits=self.limits, metadata=self.metadata)
+        return self.with_array(self.array / other)
 
     def __sub__(self, other) -> NDImage:
         """Subtract two images."""

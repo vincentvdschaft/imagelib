@@ -267,6 +267,72 @@ def test_flip(fixture_image, dim):
     assert fixture_image.flip(dim).flip(dim) == fixture_image
 
 
+def test_default_labels_and_units():
+    """Default labels follow the zyx convention; units are one empty string per axis."""
+    image = Image(np.zeros((3, 4, 5)))
+    assert image.labels == ("dim_0", "y", "x")
+    assert image.units == ("", "", "")
+
+
+def test_labels_units_length_validated():
+    """Labels and units must have one entry per dimension."""
+    with pytest.raises(AssertionError):
+        Image(np.zeros((3, 4)), labels=("only_one",))
+    with pytest.raises(AssertionError):
+        Image(np.zeros((3, 4)), units=("s", "s", "s"))
+
+
+def test_labels_units_survive_ufunc_and_arithmetic():
+    """Shape-preserving operations carry labels and units through unchanged."""
+    image = Image(np.random.rand(3, 4), labels=("a", "b"), units=("s", "m"))
+    for derived in (np.sin(image), image * 2, image + 1, image.abs(), image.copy()):
+        assert derived.labels == ("a", "b")
+        assert derived.units == ("s", "m")
+
+
+def test_labels_units_after_integer_indexing():
+    """Integer indexing drops the corresponding label and unit."""
+    image = Image(np.random.rand(3, 4, 5), labels=("z", "y", "x"), units=("s", "m", "m"))
+    sub = image[1]
+    assert sub.labels == ("y", "x")
+    assert sub.units == ("m", "m")
+
+
+def test_labels_units_after_newaxis():
+    """np.newaxis inserts an empty label and unit."""
+    image = Image(np.random.rand(3, 4), labels=("y", "x"), units=("m", "m"))
+    expanded = image[:, None, :]
+    assert expanded.labels == ("y", "", "x")
+    assert expanded.units == ("m", "", "m")
+
+
+def test_labels_units_after_transpose():
+    """Transpose reorders labels and units to match the permuted axes."""
+    image = Image(np.random.rand(3, 4, 5), labels=("z", "y", "x"), units=("s", "m", "m"))
+    transposed = image.transpose((2, 0, 1))
+    assert transposed.labels == ("x", "z", "y")
+    assert transposed.units == ("m", "s", "m")
+
+
+def test_labels_units_hdf5_roundtrip(tmp_path):
+    """Labels and units are persisted to and restored from HDF5."""
+    image = Image(np.random.rand(3, 4), labels=("y", "x"), units=("m", "m"))
+    image.save(tmp_path / "test.hdf5")
+    loaded = Image.load(tmp_path / "test.hdf5")
+    assert loaded.labels == ("y", "x")
+    assert loaded.units == ("m", "m")
+
+
+def test_labels_units_hdf5_sliced_load(tmp_path):
+    """A sliced load restructures labels and units like the array."""
+    image = Image(np.random.rand(3, 4, 5), labels=("z", "y", "x"), units=("s", "m", "m"))
+    image.save(tmp_path / "test.hdf5")
+    loaded = Image.load(tmp_path / "test.hdf5", indices=(1, slice(None), slice(None)))
+    assert loaded.shape == (4, 5)
+    assert loaded.labels == ("y", "x")
+    assert loaded.units == ("m", "m")
+
+
 def test_to_pixels(fixture_image):
     """Tests the to_pixels method."""
     image = fixture_image.to_pixels()

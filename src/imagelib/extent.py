@@ -174,6 +174,27 @@ def compute_limits_after_slicing(current_shape, limits: LimitsND, key) -> Limits
     return LimitsND(new_limits)
 
 
+def select_axis_values_after_slicing(values, key, fill) -> tuple:
+    """Reorder a per-axis sequence to match a numpy-style index key.
+
+    `values` has one entry per array dimension. Integer indexing drops the
+    corresponding entry, ``None`` / ``np.newaxis`` inserts a new entry equal to
+    ``fill``, and slices keep the entry unchanged.
+    """
+    key = _expand_ellipsis(key, len(values))
+    result = []
+    original_dim = 0
+    for key_element in key:
+        if key_element is None:
+            result.append(fill)
+        elif isinstance(key_element, int):
+            original_dim += 1
+        else:
+            result.append(values[original_dim])
+            original_dim += 1
+    return tuple(result)
+
+
 def _limits_for_selected_indices(dim_limits: Limits, num_pixels, indices) -> Limits:
     """Return the Limits spanning a sequence of selected pixel indices."""
     if len(indices) == 0:

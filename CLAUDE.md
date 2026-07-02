@@ -37,6 +37,8 @@ The virtual environment is at `.venv/` (Python 3.12). Activate with `source .ven
 - `flip(dim)` flips the array along a dimension without changing its limits
 - `extent_imshow` returns the `(x0, x1, y0, y1)` tuple for the *last two* dimensions, adjusted by half a pixel, for use with `matplotlib.imshow` (which treats extent as pixel edges, not centers)
 
+**Per-axis metadata (`limits`, `labels`, `units`).** Each carries exactly one entry per array dimension (invariant enforced at construction). They travel together through every transformation: integer indexing drops the entry, `np.newaxis` inserts an empty one, `transpose` permutes them, and shape-preserving ops (ufuncs, arithmetic, `log_compress`, …) pass them through unchanged. All three are persisted to and restored from HDF5. This threading is centralized: axis-preserving methods build results via `self._rewrap(array, limits=None)` (or the thin `with_array` / `with_limits` wrappers), and axis-restructuring uses `select_axis_values_after_slicing` (extent.py) so labels/units follow the exact same drop/insert logic as limits. When adding a method that returns a new image, use `_rewrap` rather than calling `NDImage(...)` directly, or the labels/units will be silently reset to defaults.
+
 **`saving.py`** — HDF5 serialization via h5py. Saves limits under the `limits` attribute; loading falls back to the legacy `extent` attribute (via `Extent`) for old files. Supports nested dict metadata with list-to-numbered-dict round-trip encoding.
 
 ### Public API (from `imagelib import *`)
