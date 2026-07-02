@@ -23,12 +23,19 @@ from .saving import load_hdf5_image, save_hdf5_image
 
 class NDImage:
     def __init__(
-        self, array, limits: LimitsNDInput | None = None, metadata=None, labels=None, units=None
+        self,
+        array,
+        limits: LimitsNDInput | None = None,
+        metadata=None,
+        labels=None,
+        units=None,
     ):
         self.array = np.asarray(array).copy()
         self.array.setflags(write=True)
         self._limits = (
-            LimitsND(limits) if limits is not None else LimitsND.from_shape(self.array.shape)
+            LimitsND(limits)
+            if limits is not None
+            else LimitsND.from_shape(self.array.shape)
         )
         _check_ndimage_initializers(self.array, self._limits)
         self._metadata = {}
@@ -139,12 +146,30 @@ class NDImage:
             return np.where(self.pixel_sizes > 0, self.pixel_sizes, 1e-6)
 
     @property
+    def extent(self) -> tuple:
+        """Returns the (x0, x1, y0, y1) extent for use with matplotlib's imshow.
+
+        Uses the last two dimensions, which are the (y, x) image-plane axes.
+        """
+        return tuple([limit for limits in self.limits[::-1] for limit in limits])
+
+    @property
     def extent_imshow(self) -> tuple:
         """Returns the (x0, x1, y0, y1) extent for use with matplotlib's imshow.
 
         Uses the last two dimensions, which are the (y, x) image-plane axes.
         """
         return get_limits_imshow(self.limits, self.shape)
+
+    @property
+    def translate(self) -> np.ndarray:
+        """Returns the translation vector to convert pixel indices to physical coordinates."""
+        return self.limits.origin()
+
+    @property
+    def scale(self) -> np.ndarray:
+        """Returns the scaling to apply to convert pixel indices to physical coordinates."""
+        return self.pixel_scales
 
     # ==========================================================================
     # Forward properties
@@ -604,9 +629,7 @@ class NDImage:
         assert indices.shape[1] == self.ndim
         coords = []
         for dim in range(self.ndim):
-            coords.append(
-                self.limits[dim].min + indices[:, dim] * self.pixel_size(dim)
-            )
+            coords.append(self.limits[dim].min + indices[:, dim] * self.pixel_size(dim))
         return np.stack(coords, axis=-1)
 
     def clahe(
