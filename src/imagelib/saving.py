@@ -13,7 +13,15 @@ from .extent import (
 )
 
 
-def save_hdf5_image(path, array, limits: LimitsNDInput, metadata=None, labels=None, units=None):
+def save_hdf5_image(
+    path,
+    array,
+    limits: LimitsNDInput,
+    metadata=None,
+    labels=None,
+    units=None,
+    internal_path="/image",
+):
     """
     Saves an image to an hdf5 file.
 
@@ -31,6 +39,8 @@ def save_hdf5_image(path, array, limits: LimitsNDInput, metadata=None, labels=No
         Per-dimension axis labels.
     units : sequence of str
         Per-dimension axis units.
+    internal_path : str
+        The internal path in the hdf5 file where the image will be saved.
     """
 
     limits = LimitsND(limits)
@@ -43,14 +53,28 @@ def save_hdf5_image(path, array, limits: LimitsNDInput, metadata=None, labels=No
         path.parent.mkdir(parents=True)
 
     with h5py.File(path, "w") as dataset:
-        dataset.create_dataset("image", data=array)
-        dataset["image"].attrs["limits"] = _limits_to_array(limits)
+        _create_parent_groups(dataset, internal_path)
+        dataset.create_dataset(internal_path, data=array)
+        dataset[internal_path].attrs["limits"] = _limits_to_array(limits)
         if labels is not None:
-            dataset["image"].attrs["labels"] = list(labels)
+            dataset[internal_path].attrs["labels"] = list(labels)
         if units is not None:
-            dataset["image"].attrs["units"] = list(units)
+            dataset[internal_path].attrs["units"] = list(units)
         if metadata is not None:
             save_dict_to_hdf5(dataset, metadata)
+
+
+def _create_parent_groups(hdf5_file, group_path):
+    """Creates parent groups in an HDF5 file if they do not exist."""
+    parts = group_path.strip("/").split("/")
+    if len(parts) == 1:
+        return
+    parts_without_dataset_name = parts[:-1]
+    current_path = ""
+    for part in parts_without_dataset_name:
+        current_path += f"/{part}"
+        if current_path not in hdf5_file:
+            hdf5_file.create_group(current_path)
 
 
 def _limits_to_array(limits: LimitsND) -> np.ndarray:
@@ -62,7 +86,11 @@ def _limits_to_array(limits: LimitsND) -> np.ndarray:
     return np.array(flat)
 
 
-def load_hdf5_image(path, indices=slice(None)):
+def load_hdf5_image(
+    path,
+    indices=slice(None),
+    internal_path="/image",
+):
     """
     Loads an image from an hdf5 file.
 
@@ -72,6 +100,8 @@ def load_hdf5_image(path, indices=slice(None)):
         The path to the hdf5 file.
     indices : slice
         The indices to load from the image.
+    internal_path : str
+        The internal path in the hdf5 file where the image is saved.
 
     Returns
     -------
@@ -80,9 +110,9 @@ def load_hdf5_image(path, indices=slice(None)):
     """
 
     with h5py.File(path, "r") as dataset:
-        attrs = dataset["image"].attrs
-        original_shape = dataset["image"].shape
-        array = dataset["image"][indices]
+        attrs = dataset[internal_path].attrs
+        original_shape = dataset[internal_path].shape
+        array = dataset[internal_path][indices]
         limits = compute_limits_after_slicing(
             current_shape=original_shape, limits=_read_limits(attrs), key=indices
         )

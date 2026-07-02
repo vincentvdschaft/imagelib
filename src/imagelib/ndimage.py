@@ -279,7 +279,15 @@ class NDImage:
     # ==========================================================================
     # Functions
     # ==========================================================================
-    def save(self, path, cmap="gray", vmin=None, vmax=None) -> NDImage:
+    def save(
+        self,
+        path,
+        group="/image",
+        cmap="gray",
+        vmin=None,
+        vmax=None,
+        internal_path="/image",
+    ) -> NDImage:
         """Save image to HDF5 file."""
         path = Path(path)
         if path.suffix in [".png", ".jpg", ".jpeg", ".bmp", ".tiff"]:
@@ -294,15 +302,16 @@ class NDImage:
             metadata=self.metadata,
             labels=self.labels,
             units=self.units,
+            internal_path=internal_path,
         )
         return self
 
     @classmethod
-    def load(cls, path, indices=slice(None)) -> NDImage:
+    def load(cls, path, indices=slice(None), internal_path="/image") -> NDImage:
         """Load image from HDF5 file."""
         path = Path(path)
         assert path.suffix == ".hdf5", "File must be HDF5 format."
-        return load_hdf5_image(path, indices=indices)
+        return load_hdf5_image(path, indices=indices, internal_path=internal_path)
 
     def _rewrap(self, array, limits: LimitsNDInput | None = None) -> NDImage:
         """Create a new image carrying this image's metadata, labels and units.
