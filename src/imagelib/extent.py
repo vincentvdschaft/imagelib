@@ -108,6 +108,22 @@ class LimitsND:
     def __hash__(self):
         return hash(tuple(self))
 
+    def make_grid(self, shape: tuple[int, ...]) -> tuple[np.ndarray, ...]:
+        """Create a meshgrid of coordinates for the given shape, using the limits.
+
+        Returns a grid of shape (*shape, ndim), where the last dimension contains the coordinates for each axis.
+
+        If the limits represent (z, y, x), then the shape should be (nz, ny, nx), and the output will be (nz, ny, nx, zyx).
+        """
+        if len(shape) != self.ndim:
+            raise ValueError(
+                f"Shape length {len(shape)} does not match number of dimensions {self.ndim}"
+            )
+        grids = []
+        for dim, (limit, size) in enumerate(zip(self.limits, shape)):
+            grids.append(np.linspace(limit.min, limit.max, size))
+        return np.stack(np.meshgrid(*grids, indexing="ij"), axis=-1)
+
 
 class Extent(tuple):
     """Legacy flat-tuple encoding of spatial limits: (dim0_min, dim0_max, dim1_min, dim1_max, ...).
