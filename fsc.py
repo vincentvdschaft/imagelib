@@ -5,8 +5,8 @@ from imagelib import Image
 
 im = Image(
     np.arange(4 * 4).reshape(4, 4),
-    labels=("y", "x"),
-    units=("mm", "mm"),
+    # labels=("y", "x"),
+    # units=("mm", "mm"),
     limits=((0, 6), (0, 3)),
 )
 
