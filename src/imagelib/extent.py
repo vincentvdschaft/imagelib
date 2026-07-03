@@ -101,6 +101,43 @@ class LimitsND:
             )
         return LimitsND([self.limits[i] for i in index_array])
 
+    def __setitem__(self, index, value: LimitsLike):
+        # Mirrors __getitem__'s dispatch: an int sets a single element,
+        # everything else selects a run of elements and broadcasts the same
+        # LimitsLike value into each of them (each gets its own Limits
+        # instance, never a shared one, since Limits is mutable).
+        min_, max_ = value if isinstance(value, Limits) else Limits(*value)
+
+        if isinstance(index, (int, np.integer)):
+            self.limits[index] = Limits(min_, max_)
+            return
+        if index is Ellipsis:
+            index = slice(None)
+        if isinstance(index, tuple):
+            if len(index) == 1:
+                self[index[0]] = value
+                return
+            raise IndexError(
+                f"Too many indices for LimitsND: index {index} for {self.ndim} dimension(s)"
+            )
+
+        if isinstance(index, slice):
+            positions = range(len(self.limits))[index]
+        else:
+            index_array = np.asarray(index)
+            if index_array.dtype == bool:
+                if index_array.shape != (len(self.limits),):
+                    raise IndexError(
+                        f"Boolean index shape {index_array.shape} does not match "
+                        f"LimitsND length ({len(self.limits)},)"
+                    )
+                positions = np.flatnonzero(index_array)
+            else:
+                positions = index_array
+
+        for position in positions:
+            self.limits[int(position)] = Limits(min_, max_)
+
     def sizes(self) -> np.ndarray:
         return np.array([limit.size() for limit in self.limits])
 
