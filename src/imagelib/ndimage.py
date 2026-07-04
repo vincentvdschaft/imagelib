@@ -283,6 +283,7 @@ class NDImage:
         self,
         path,
         group="/",
+        append=False,
     ) -> NDImage:
         """Save image to HDF5 file.
 
@@ -292,6 +293,7 @@ class NDImage:
         Args:
             path: Path to the HDF5 file.
             group: Group within the HDF5 file. Default is root group.
+            append: If True, append to an existing file. If False, overwrite the file.
 
         Returns:
             self: The NDImage instance (for chaining).
@@ -307,6 +309,7 @@ class NDImage:
             labels=self.labels,
             units=self.units,
             group=group,
+            append=append,
         )
         return self
 

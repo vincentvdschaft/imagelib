@@ -21,6 +21,7 @@ def save_hdf5_image(
     labels=None,
     units=None,
     group="/image",
+    append=False,
 ):
     """
     Saves an image to an hdf5 file.
@@ -52,7 +53,8 @@ def save_hdf5_image(
     if not path.parent.exists():
         path.parent.mkdir(parents=True)
 
-    with h5py.File(path, "w") as hdf5_file:
+    file_mode = "a" if append else "w"
+    with h5py.File(path, file_mode) as hdf5_file:
         hdf5_file.require_group(group)
         dataset = hdf5_file[group].create_dataset("image", data=array)
         dataset.attrs["limits"] = _limits_to_array(limits)
