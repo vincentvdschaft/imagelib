@@ -282,17 +282,21 @@ class NDImage:
     def save(
         self,
         path,
-        group="/image",
-        cmap="gray",
-        vmin=None,
-        vmax=None,
-        internal_path="/image",
+        group="/",
     ) -> NDImage:
-        """Save image to HDF5 file."""
+        """Save image to HDF5 file.
+
+        The image data is saved to a dataset called 'image' in the given group.
+        The metadata is saved in the same group.
+
+        Args:
+            path: Path to the HDF5 file.
+            group: Group within the HDF5 file. Default is root group.
+
+        Returns:
+            self: The NDImage instance (for chaining).
+        """
         path = Path(path)
-        if path.suffix in [".png", ".jpg", ".jpeg", ".bmp", ".tiff"]:
-            matplotlib.image.imsave(path, self.array.T, cmap=cmap, vmin=vmin, vmax=vmax)
-            return self
         assert path.suffix == ".hdf5", "File must be HDF5 format."
 
         save_hdf5_image(
@@ -302,16 +306,29 @@ class NDImage:
             metadata=self.metadata,
             labels=self.labels,
             units=self.units,
-            internal_path=internal_path,
+            group=group,
         )
         return self
 
+    def save_png(
+        self,
+        path,
+        cmap="gray",
+        vmin=None,
+        vmax=None,
+    ) -> NDImage:
+        """Save image to PNG file."""
+        path = Path(path)
+        assert path.suffix == ".png", "File must be PNG format."
+        matplotlib.image.imsave(path, self.array.T, cmap=cmap, vmin=vmin, vmax=vmax)
+        return self
+
     @classmethod
-    def load(cls, path, indices=slice(None), internal_path="/image") -> NDImage:
+    def load(cls, path, indices=slice(None), group="/") -> NDImage:
         """Load image from HDF5 file."""
         path = Path(path)
         assert path.suffix == ".hdf5", "File must be HDF5 format."
-        return load_hdf5_image(path, indices=indices, internal_path=internal_path)
+        return load_hdf5_image(path, indices=indices, group=group)
 
     def _rewrap(self, array, limits: LimitsNDInput | None = None) -> NDImage:
         """Create a new image carrying this image's metadata, labels and units.
@@ -771,3 +788,37 @@ def compute_pixel_sizes(limits: LimitsND, shape) -> np.ndarray:
         pixel_size = limits[dim].size() / (shape[dim] - 1) if shape[dim] > 1 else 0.0
         pixel_sizes.append(pixel_size)
     return np.array(pixel_sizes)
+
+
+def stack(
+    images: list[NDImage], axis: int = 0, limits: Limits | tuple | None = None
+) -> NDImage:
+    """Stack a list of NDImage objects along a new axis.
+
+    Args:
+        images: List of NDImage objects to stack.
+        axis: Axis along which to stack the images. Default is 0.
+        limits: Optional LimitsND object for the new stacked image. If None, the limits
+            will be set to (0, len(images)-1).
+
+    Returns:
+        NDImage: A new NDImage object representing the stacked images.
+    """
+    arrays = [img.array for img in images]
+    stacked_array = np.stack(arrays, axis=axis)
+
+    if limits is None:
+        limits = Limits(0, len(images) - 1)
+    else:
+        limits = Limits(*limits)
+
+    limits_list = []
+    index_in_dims = 0
+    for dim in range(stacked_array.ndim):
+        if dim == axis:
+            limits_list.append(limits)
+        else:
+            limits_list.append(images[0].limits[index_in_dims])
+            index_in_dims += 1
+
+    return NDImage(stacked_array, limits=LimitsND(limits_list))

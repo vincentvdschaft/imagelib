@@ -203,14 +203,14 @@ def test_limits_nd_make_grid_rejects_mismatched_shape():
 def test_limits_nd_fitted_to_pixel_size_scalar():
     """A single pixel size is applied to every dimension."""
     nd = LimitsND([(0, 10), (0, 10)])
-    fitted = nd.fitted_to_pixel_size(3.0)
+    fitted = nd.fitted_to_pixel_sizes(3.0)
     assert fitted.limits == (Limits(0, 9), Limits(0, 9))
 
 
 def test_limits_nd_fitted_to_pixel_size_per_dimension():
     """A sequence of pixel sizes is applied one per dimension."""
     nd = LimitsND([(0, 10), (0, 9)])
-    fitted = nd.fitted_to_pixel_size([3.0, 2.0])
+    fitted = nd.fitted_to_pixel_sizes([3.0, 2.0])
     assert fitted.limits == (Limits(0, 9), Limits(0, 8))
 
 
@@ -218,4 +218,4 @@ def test_limits_nd_fitted_to_pixel_size_rejects_mismatched_length():
     """The pixel size sequence must have one entry per dimension."""
     nd = LimitsND([(0, 10), (0, 9)])
     with pytest.raises(ValueError):
-        nd.fitted_to_pixel_size([3.0, 2.0, 1.0])
+        nd.fitted_to_pixel_sizes([3.0, 2.0, 1.0])

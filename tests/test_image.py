@@ -136,7 +136,9 @@ def test_getitem_slice(fixture_image, slice_x, slice_y):
         coords = fixture_image.vals(dim)[key]
         expected_limits.append((coords[0], coords[-1]))
     for dim, limits in enumerate(expected_limits):
-        assert np.allclose((image.limits[dim].min, image.limits[dim].max), sorted(limits))
+        assert np.allclose(
+            (image.limits[dim].min, image.limits[dim].max), sorted(limits)
+        )
 
 
 def test_limits_after_slicing():
@@ -176,7 +178,7 @@ def test_load_legacy_extent_format(tmp_path):
 def test_save_image_format(fixture_image, tmp_path, suffix):
     """Tests saving an image to an image file."""
     save_path = tmp_path / f"test{suffix}"
-    fixture_image.save(save_path)
+    fixture_image.save_png(save_path)
     assert Path(save_path).exists()
 
 
@@ -292,7 +294,9 @@ def test_labels_units_survive_ufunc_and_arithmetic():
 
 def test_labels_units_after_integer_indexing():
     """Integer indexing drops the corresponding label and unit."""
-    image = Image(np.random.rand(3, 4, 5), labels=("z", "y", "x"), units=("s", "m", "m"))
+    image = Image(
+        np.random.rand(3, 4, 5), labels=("z", "y", "x"), units=("s", "m", "m")
+    )
     sub = image[1]
     assert sub.labels == ("y", "x")
     assert sub.units == ("m", "m")
@@ -308,7 +312,9 @@ def test_labels_units_after_newaxis():
 
 def test_labels_units_after_transpose():
     """Transpose reorders labels and units to match the permuted axes."""
-    image = Image(np.random.rand(3, 4, 5), labels=("z", "y", "x"), units=("s", "m", "m"))
+    image = Image(
+        np.random.rand(3, 4, 5), labels=("z", "y", "x"), units=("s", "m", "m")
+    )
     transposed = image.transpose((2, 0, 1))
     assert transposed.labels == ("x", "z", "y")
     assert transposed.units == ("m", "s", "m")
@@ -325,7 +331,9 @@ def test_labels_units_hdf5_roundtrip(tmp_path):
 
 def test_labels_units_hdf5_sliced_load(tmp_path):
     """A sliced load restructures labels and units like the array."""
-    image = Image(np.random.rand(3, 4, 5), labels=("z", "y", "x"), units=("s", "m", "m"))
+    image = Image(
+        np.random.rand(3, 4, 5), labels=("z", "y", "x"), units=("s", "m", "m")
+    )
     image.save(tmp_path / "test.hdf5")
     loaded = Image.load(tmp_path / "test.hdf5", indices=(1, slice(None), slice(None)))
     assert loaded.shape == (4, 5)

@@ -1,5 +1,6 @@
 from .extent import Limits, LimitsND
 from .ndimage import NDImage as Image
+from .ndimage import stack
 from .saving import check_hdf5_image_hash, load_hdf5_image, save_hdf5_image
 
 __all__ = [
@@ -10,4 +11,5 @@ __all__ = [
     "metrics",
     "Limits",
     "LimitsND",
+    "stack",
 ]
