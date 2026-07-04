@@ -48,7 +48,7 @@ def save_hdf5_image(
 
     path = Path(path)
 
-    if path.exists():
+    if path.exists() and not append:
         path.unlink()
     if not path.parent.exists():
         path.parent.mkdir(parents=True)
