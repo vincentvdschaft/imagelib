@@ -181,7 +181,26 @@ class LimitsND:
             other = LimitsND(other)
         return LimitsND(self.limits + other.limits)
 
-    def make_grid(self, shape: tuple[int, ...]) -> np.ndarray:
+    def make_grid(
+        self, shape: tuple[int, ...] = None, pixel_sizes: Sequence[float] | float = None
+    ) -> np.ndarray:
+        """Create a meshgrid of coordinates for the given shape, using the limits.
+
+        Returns a grid of shape (*shape, ndim), where the last dimension contains the coordinates for each axis.
+
+        If the limits represent (z, y, x), then the shape should be (nz, ny, nx), and the output will be (nz, ny, nx, zyx).
+
+        If `shape` is not provided, it will be computed from `pixel_sizes` if given.
+        """
+        if shape is not None and pixel_sizes is not None:
+            raise ValueError("Provide either 'shape' or 'pixel_sizes', not both.")
+        if shape is None:
+            if pixel_sizes is None:
+                raise ValueError("Either 'shape' or 'pixel_sizes' must be provided.")
+            shape = self.get_shape_from_pixel_sizes(pixel_sizes)
+        return self._make_grid(shape)
+
+    def _make_grid(self, shape: tuple[int, ...]) -> np.ndarray:
         """Create a meshgrid of coordinates for the given shape, using the limits.
 
         Returns a grid of shape (*shape, ndim), where the last dimension contains the coordinates for each axis.
@@ -197,7 +216,7 @@ class LimitsND:
             grids.append(np.linspace(limit.min, limit.max, size))
         return np.stack(np.meshgrid(*grids, indexing="ij"), axis=-1)
 
-    def fitted_to_pixel_size(self, pixel_sizes: Sequence[float] | float) -> LimitsND:
+    def fitted_to_pixel_sizes(self, pixel_sizes: Sequence[float] | float) -> LimitsND:
         """Adjust the limits to fit an integer number of pixels given the pixel sizes.
 
         The pixel sizes can be a single float (applied to all dimensions) or a sequence of floats (one per dimension).
@@ -214,6 +233,25 @@ class LimitsND:
             for limit, pixel_size in zip(self.limits, pixel_sizes)
         )
         return LimitsND(new_limits)
+
+    def get_shape_from_pixel_sizes(
+        self, pixel_sizes: Sequence[float] | float
+    ) -> tuple[int, ...]:
+        """Compute the shape (number of pixels) for each dimension given the pixel sizes.
+
+        The pixel sizes can be a single float (applied to all dimensions) or a sequence of floats (one per dimension).
+        """
+        if isinstance(pixel_sizes, (float, int)):
+            pixel_sizes = [float(pixel_sizes)] * self.ndim
+        elif len(pixel_sizes) != self.ndim:
+            raise ValueError(
+                f"Pixel sizes length {len(pixel_sizes)} does not match number of dimensions {self.ndim}"
+            )
+
+        return tuple(
+            max(1, round(limit.size() / pixel_size))
+            for limit, pixel_size in zip(self.limits, pixel_sizes)
+        )
 
 
 class Extent(tuple):
