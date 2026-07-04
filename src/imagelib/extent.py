@@ -8,18 +8,16 @@ from typing import Sequence, Union
 import numpy as np
 
 
-@dataclass
+@dataclass(frozen=True)
 class Limits:
     min: float
     max: float
 
     def __post_init__(self):
-        self.min = float(self.min)
-        self.max = float(self.max)
-        true_min = min(self.min, self.max)
-        true_max = max(self.min, self.max)
-        self.min = true_min
-        self.max = true_max
+        true_min = float(min(self.min, self.max))
+        true_max = float(max(self.min, self.max))
+        object.__setattr__(self, "min", true_min)
+        object.__setattr__(self, "max", true_max)
 
     def size(self) -> float:
         return self.max - self.min
@@ -34,6 +32,16 @@ class Limits:
     def __hash__(self):
         return hash((self.min, self.max))
 
+    def __eq__(self, other):
+        if not isinstance(other, Limits):
+            other = Limits(*other)
+        return self.min == other.min and self.max == other.max
+
+    def __add__(self, other):
+        if not isinstance(other, Limits):
+            other = Limits(*other)
+        return LimitsND((self, other))
+
 
 LimitsLike = Union["Limits", tuple[float, float], Sequence[float]]
 LimitsNDInput = Union[
@@ -44,16 +52,16 @@ LimitsNDInput = Union[
 ]
 
 
-@dataclass
+@dataclass(frozen=True)
 class LimitsND:
-    limits: list[Limits] = field(default_factory=list)
+    limits: tuple[Limits, ...] = field(default_factory=tuple)
 
     def __post_init__(self):
         raw = self.limits.limits if isinstance(self.limits, LimitsND) else self.limits
 
         # already a LimitsND-shaped list of Limits objects
         if all(isinstance(item, Limits) for item in raw):
-            self.limits = list(raw)
+            object.__setattr__(self, "limits", tuple(raw))
             return
 
         arr = np.asarray(raw, dtype=float)
@@ -67,7 +75,7 @@ class LimitsND:
         elif arr.ndim != 2 or arr.shape[1] != 2:
             raise ValueError(f"Expected shape (N, 2) or flat (2N,), got {arr.shape}")
 
-        self.limits = [Limits(lo, hi) for lo, hi in arr]
+        object.__setattr__(self, "limits", tuple(Limits(lo, hi) for lo, hi in arr))
 
     @property
     def ndim(self) -> int:
@@ -82,17 +90,15 @@ class LimitsND:
     @classmethod
     def from_extent(cls, extent: Extent) -> LimitsND:
         """Create a LimitsND object from a legacy Extent object."""
-        limits = []
-        for dim in range(extent.ndim):
-            limits.append(Limits(extent.start(dim), extent.end(dim)))
+        limits = tuple(
+            Limits(extent.start(dim), extent.end(dim)) for dim in range(extent.ndim)
+        )
         return cls(limits)
 
     @classmethod
     def from_shape(cls, shape: tuple[int, ...]) -> LimitsND:
         """Create a LimitsND object from a shape tuple, where each dimension's limits are (0, size-1)."""
-        limits = []
-        for size in shape:
-            limits.append(Limits(0, size - 1))
+        limits = tuple(Limits(0, size - 1) for size in shape)
         return cls(limits)
 
     def __iter__(self):
@@ -108,7 +114,12 @@ class LimitsND:
     def __hash__(self):
         return hash(tuple(self))
 
-    def make_grid(self, shape: tuple[int, ...]) -> tuple[np.ndarray, ...]:
+    def __add__(self, other):
+        if not isinstance(other, LimitsND):
+            other = LimitsND(other)
+        return LimitsND(self.limits + other.limits)
+
+    def make_grid(self, shape: tuple[int, ...]) -> np.ndarray:
         """Create a meshgrid of coordinates for the given shape, using the limits.
 
         Returns a grid of shape (*shape, ndim), where the last dimension contains the coordinates for each axis.
@@ -123,6 +134,24 @@ class LimitsND:
         for dim, (limit, size) in enumerate(zip(self.limits, shape)):
             grids.append(np.linspace(limit.min, limit.max, size))
         return np.stack(np.meshgrid(*grids, indexing="ij"), axis=-1)
+
+    def fitted_to_pixel_size(self, pixel_sizes: Sequence[float] | float) -> LimitsND:
+        """Adjust the limits to fit an integer number of pixels given the pixel sizes.
+
+        The pixel sizes can be a single float (applied to all dimensions) or a sequence of floats (one per dimension).
+        """
+        if isinstance(pixel_sizes, (float, int)):
+            pixel_sizes = [float(pixel_sizes)] * self.ndim
+        elif len(pixel_sizes) != self.ndim:
+            raise ValueError(
+                f"Pixel sizes length {len(pixel_sizes)} does not match number of dimensions {self.ndim}"
+            )
+
+        new_limits = tuple(
+            Limits(limit.min, limit.min + round(limit.size() / pixel_size) * pixel_size)
+            for limit, pixel_size in zip(self.limits, pixel_sizes)
+        )
+        return LimitsND(new_limits)
 
 
 class Extent(tuple):
@@ -187,7 +216,7 @@ def compute_limits_after_slicing(current_shape, limits: LimitsND, key) -> Limits
             )
             original_dim += 1
 
-    return LimitsND(new_limits)
+    return LimitsND(tuple(new_limits))
 
 
 def select_axis_values_after_slicing(values, key, fill) -> tuple:

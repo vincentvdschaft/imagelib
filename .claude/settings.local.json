@@ -9,7 +9,9 @@
       "Bash(grep -rln \"from imagelib\\\\|import imagelib\" --include=\"*.py\" ~ 2>/dev/null | grep -v \"/2-files/pymodules/imagelib/\" | grep -v \".venv\" | head -30)",
       "Read(//home/vincent/**)",
       "Bash(.venv/bin/pytest -q)",
-      "Bash(.venv/bin/python -c ' *)"
+      "Bash(.venv/bin/python -c ' *)",
+      "Bash(.venv/bin/python -m pytest -q)",
+      "Bash(.venv/bin/python -m pytest tests/test_limits.py -q)"
     ]
   },
   "outputStyle": "Explanatory"
