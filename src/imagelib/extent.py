@@ -149,6 +149,14 @@ class LimitsND:
     def sizes(self) -> np.ndarray:
         return np.array([limit.size() for limit in self.limits])
 
+    def to_extent(self) -> tuple[float, ...]:
+        """Convert the LimitsND object to a legacy Extent tuple."""
+        extent = []
+        for limit in self.limits:
+            extent.append(limit.min)
+            extent.append(limit.max)
+        return tuple(extent)
+
     @classmethod
     def from_extent(cls, extent: Extent) -> LimitsND:
         """Create a LimitsND object from a legacy Extent object."""
