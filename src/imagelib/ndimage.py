@@ -323,7 +323,7 @@ class NDImage:
         """Save image to PNG file."""
         path = Path(path)
         assert path.suffix == ".png", "File must be PNG format."
-        matplotlib.image.imsave(path, self.array.T, cmap=cmap, vmin=vmin, vmax=vmax)
+        matplotlib.image.imsave(path, self.array, cmap=cmap, vmin=vmin, vmax=vmax)
         return self
 
     @classmethod
