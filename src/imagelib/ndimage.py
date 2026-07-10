@@ -323,7 +323,7 @@ class NDImage:
         """Save image to PNG file."""
         path = Path(path)
         assert path.suffix == ".png", "File must be PNG format."
-        matplotlib.image.imsave(path, self.array.T, cmap=cmap, vmin=vmin, vmax=vmax)
+        matplotlib.image.imsave(path, self.array, cmap=cmap, vmin=vmin, vmax=vmax)
         return self
 
     @classmethod
@@ -396,6 +396,12 @@ class NDImage:
         )
 
         return self._rewrap(new_data, limits)
+
+    def resample_like(self, other: NDImage, method="linear", fill_value=0) -> NDImage:
+        """Resample image to match the shape and limits of another image."""
+        return self.resample(
+            shape=other.shape, limits=other.limits, method=method, fill_value=fill_value
+        )
 
     def transpose(self, axes=None) -> NDImage:
         """Transpose the image."""
