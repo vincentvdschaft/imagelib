@@ -253,6 +253,14 @@ class LimitsND:
             for limit, pixel_size in zip(self.limits, pixel_sizes)
         )
 
+    @property
+    def aspect(self) -> np.ndarray:
+        """Return the aspect ratio (size of each dimension) as a numpy array."""
+        if self.ndim < 2:
+            raise ValueError("Aspect ratio is only defined for 2 or more dimensions.")
+
+        return self[-1].size() / self[-2].size()
+
 
 class Extent(tuple):
     """Legacy flat-tuple encoding of spatial limits: (dim0_min, dim0_max, dim1_min, dim1_max, ...).
