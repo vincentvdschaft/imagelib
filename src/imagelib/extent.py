@@ -2,9 +2,8 @@
 
 from __future__ import annotations
 
-from collections.abc import Sequence
 from dataclasses import dataclass, field
-from typing import Any, Union
+from typing import Any, Sequence, Union
 
 import numpy as np
 
@@ -60,25 +59,14 @@ class LimitsND:
     )  # accepts LimitsNDInput; normalized to list[Limits] in __post_init__
 
     def __post_init__(self):
-        """Accept multiple formats: LimitsND, list of Limits, list/tuple of tuples/lists, flat sequence, or ndarray."""
         raw = self.limits.limits if isinstance(self.limits, LimitsND) else self.limits
 
         # already a LimitsND-shaped list of Limits objects
-        if (
-            isinstance(raw, (list, tuple))
-            and raw
-            and all(isinstance(item, Limits) for item in raw)
-        ):
+        if all(isinstance(item, Limits) for item in raw):
             self.limits = list(raw)
             return
 
-        try:
-            arr = np.asarray(raw, dtype=float)
-        except (ValueError, TypeError) as e:
-            raise ValueError(
-                f"Cannot convert input to numeric array. Expected list/tuple of tuples/lists, "
-                f"list of Limits, 2D array, or flat sequence, got {type(raw).__name__}"
-            ) from e
+        arr = np.asarray(raw, dtype=float)
 
         if arr.ndim == 1:
             if arr.size % 2 != 0:
@@ -294,7 +282,7 @@ class Extent(tuple):
         initializer = [float(value) for value in initializer]
         assert len(initializer) % 2 == 0, "Extent must have an even number of elements."
 
-        return super().__new__(cls, initializer)
+        return super(Extent, cls).__new__(cls, initializer)
 
     @property
     def ndim(self):
