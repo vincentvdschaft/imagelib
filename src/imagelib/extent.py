@@ -63,7 +63,7 @@ class LimitsND:
 
         # already a LimitsND-shaped list of Limits objects
         if all(isinstance(item, Limits) for item in raw):
-            self.limits = list(raw)
+            object.__setattr__(self, "limits", list(raw))
             return
 
         arr = np.asarray(raw, dtype=float)
