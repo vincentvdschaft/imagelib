@@ -1,8 +1,7 @@
 import numpy as np
-from pytest import fixture
-
 from imagelib import Image
 from imagelib.extent import Extent
+from pytest import fixture
 
 
 @fixture
