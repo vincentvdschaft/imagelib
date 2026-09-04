@@ -147,11 +147,13 @@ class NDImage:
 
     @property
     def extent(self) -> tuple:
-        """Returns the (x0, x1, y0, y1) extent for use with matplotlib's imshow.
-
-        Uses the last two dimensions, which are the (y, x) image-plane axes.
-        """
+        """Returns the (x0, x1, y0, y1) extent for use with matplotlib's imshow."""
         return tuple([limit for limits in self.limits[::-1] for limit in limits])
+
+    @property
+    def extent_zyx(self) -> tuple:
+        """Returns the (z0, z1, y0, y1, x0, x1) extent for use with matplotlib's imshow."""
+        return tuple([limit for limits in self.limits for limit in limits])
 
     @property
     def extent_imshow(self) -> tuple:

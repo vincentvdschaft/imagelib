@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Sequence, Union
+from typing import Any, Sequence, Union
 
 import numpy as np
 
@@ -54,14 +54,16 @@ LimitsNDInput = Union[
 
 @dataclass(frozen=True)
 class LimitsND:
-    limits: tuple[Limits, ...] = field(default_factory=tuple)
+    limits: Any = field(
+        default_factory=list
+    )  # accepts LimitsNDInput; normalized to list[Limits] in __post_init__
 
     def __post_init__(self):
         raw = self.limits.limits if isinstance(self.limits, LimitsND) else self.limits
 
         # already a LimitsND-shaped list of Limits objects
         if all(isinstance(item, Limits) for item in raw):
-            object.__setattr__(self, "limits", tuple(raw))
+            object.__setattr__(self, "limits", list(raw))
             return
 
         arr = np.asarray(raw, dtype=float)
@@ -260,6 +262,14 @@ class LimitsND:
             max(1, round(limit.size() / pixel_size))
             for limit, pixel_size in zip(self.limits, pixel_sizes)
         )
+
+    @property
+    def aspect(self) -> np.ndarray:
+        """Return the aspect ratio (size of each dimension) as a numpy array."""
+        if self.ndim < 2:
+            raise ValueError("Aspect ratio is only defined for 2 or more dimensions.")
+
+        return self[-1].size() / self[-2].size()
 
 
 class Extent(tuple):
