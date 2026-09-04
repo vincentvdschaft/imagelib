@@ -635,6 +635,30 @@ class NDImage:
         indices = self.coordinates_to_indices(positions)
         return self.array[tuple(indices[:, dim] for dim in range(self.ndim))]
 
+    def sample_interpolated(
+        self, positions, method="linear", fill_value=0
+    ) -> np.ndarray:
+        """Sample image values at the given spatial positions with interpolation.
+
+        Args:
+            positions: np.ndarray of shape (N, D) Spatial coordinates to sample. D
+            must match the image dimensionality.
+            method: Interpolation method. One of 'linear', 'nearest', 'cubic'.
+            fill_value: Value to use for points outside the interpolation domain.
+
+        Returns:
+            values: Interpolated image values at each position of shape (N,) .
+        """
+        all_vals = [self.vals(dim) for dim in range(self.ndim)]
+        interpolator = RegularGridInterpolator(
+            all_vals,
+            self.array,
+            bounds_error=False,
+            fill_value=fill_value,
+            method=method,
+        )
+        return interpolator(positions)
+
     def coordinates_to_indices(self, coordinates) -> np.ndarray:
         """Convert coordinates to pixel indices."""
         assert coordinates.ndim == 2
