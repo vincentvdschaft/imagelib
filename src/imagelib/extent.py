@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass, field
-from typing import Any, Sequence, Union
+from typing import Any, Union
 
 import numpy as np
 
@@ -167,6 +168,10 @@ class LimitsND:
         )
         return cls(limits)
 
+    def reversed(self) -> LimitsND:
+        """Return a new LimitsND object with the order of dimensions reversed."""
+        return LimitsND(tuple(reversed(self.limits)))
+
     @classmethod
     def from_shape(cls, shape: tuple[int, ...]) -> LimitsND:
         """Create a LimitsND object from a shape tuple, where each dimension's limits are (0, size-1)."""
@@ -282,7 +287,7 @@ class Extent(tuple):
         initializer = [float(value) for value in initializer]
         assert len(initializer) % 2 == 0, "Extent must have an even number of elements."
 
-        return super(Extent, cls).__new__(cls, initializer)
+        return super().__new__(cls, initializer)
 
     @property
     def ndim(self):

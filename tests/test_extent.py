@@ -1,5 +1,4 @@
 import pytest
-
 from imagelib.extent import Extent
 
 
