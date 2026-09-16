@@ -43,18 +43,6 @@ class Limits:
             other = Limits(*other)
         return LimitsND((self, other))
 
-    # Unpacking support for Limits
-    def __len__(self):
-        return 2
-
-    def __getitem__(self, index):
-        if index == 0:
-            return self.min
-        elif index == 1:
-            return self.max
-        else:
-            raise IndexError("Limits index out of range")
-
 
 LimitsLike = Union["Limits", tuple[float, float], Sequence[float]]
 LimitsNDInput = Union[
@@ -204,9 +192,13 @@ class LimitsND:
         return hash(tuple(self))
 
     def __add__(self, other):
+        if isinstance(other, (tuple, list)):
+            other = LimitsND(other)
+        if isinstance(other, Limits):
+            other = LimitsND((other,))
         if not isinstance(other, LimitsND):
             other = LimitsND(other)
-        return LimitsND(list(self.limits) + list(other.limits))
+        return LimitsND((*self.limits, *other.limits))
 
     def make_grid(
         self, shape: tuple[int, ...] = None, pixel_sizes: Sequence[float] | float = None
