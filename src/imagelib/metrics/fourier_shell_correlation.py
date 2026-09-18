@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass
+from pathlib import Path
 
 import numpy as np
 from scipy.ndimage import uniform_filter1d
@@ -15,25 +16,39 @@ class FSCResult:
     correlations: np.ndarray
     num_voxels_in_shell: np.ndarray
 
+    def save(self, path: str | Path):
+        """Saves the FSC result to a file."""
+        np.savez(
+            path,
+            frequencies=self.frequencies,
+            correlations=self.correlations,
+            num_voxels_in_shell=self.num_voxels_in_shell,
+        )
+
+    @classmethod
+    def load(cls, path: str | Path) -> FSCResult:
+        """Loads the FSC result from a file."""
+        data = np.load(path)
+        return cls(
+            frequencies=data["frequencies"],
+            correlations=data["correlations"],
+            num_voxels_in_shell=data["num_voxels_in_shell"],
+        )
+
 
 def fourier_shell_correlation(
     image1: Image, image2: Image, num_shells: int
 ) -> FSCResult:
     """Computes the Fourier Shell Correlation (FSC) between two 3D images.
 
-    Parameters
-    ----------
-        image1 : Image
-            First ND image
-        image2 : Image
-            Second ND image
-        num_shells : int
-            Number of shells to compute the FSC over
+    Args:
+        image1: First ND image
+        image2: Second ND image
+        num_shells: Number of shells to compute the FSC over
 
-    Returns
-    -------
-        FSCResult
-            A dataclass containing frequencies, correlations, and number of voxels in each shell
+    Returns:
+        fsc_result: A dataclass containing frequencies, correlations, and number of
+            voxels in each shell
     """
     _check_input_fourier_shell_correlation(image1, image2, num_shells)
 
@@ -41,8 +56,9 @@ def fourier_shell_correlation(
 
     grid = image1_ft.grid
     radii = np.linalg.norm(grid, axis=-1)
-    final_frequency = _compute_smallest_maximum(grid)
-
+    pixel_size = image1.pixel_size(0)
+    final_frequency = _compute_final_frequency(image1.shape, pixel_size)
+    print(f"Final frequency: {final_frequency:.4f} 1/μm")
     num_voxels_in_shell = np.zeros(num_shells, dtype=np.int64)
 
     shell_width = final_frequency / num_shells
@@ -75,12 +91,10 @@ def fourier_shell_correlation(
     )
 
 
-def _compute_smallest_maximum(grid: np.ndarray) -> float:
-    """Computes the smallest maximum radius in the Fourier grid."""
-    flatgrid = grid.reshape(-1, grid.shape[-1])
-    max_per_axis = np.max(np.abs(flatgrid), axis=0)
-    smallest_max = np.min(max_per_axis)
-    return smallest_max
+def _compute_final_frequency(shape: tuple, pixel_size: float) -> float:
+    """Computes the smallest maximum frequency in the Fourier grid."""
+    smallest_dim = min(shape)
+    return np.max(np.fft.fftfreq(smallest_dim, d=pixel_size))
 
 
 def _check_input_fourier_shell_correlation(
@@ -97,6 +111,8 @@ def _check_input_fourier_shell_correlation(
         raise ValueError("Images must have the same limits")
     if not isinstance(num_shells, int) or num_shells <= 0:
         raise ValueError("num_shells must be a positive integer")
+    if not np.diff(image1.pixel_sizes).max() < 1e-6:
+        raise ValueError("images must have isotropic pixel sizes")
 
 
 def threshold_2sigma(num_voxels: np.ndarray) -> np.ndarray:
