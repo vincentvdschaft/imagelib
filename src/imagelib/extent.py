@@ -67,6 +67,12 @@ class LimitsND:
             object.__setattr__(self, "limits", list(raw))
             return
 
+        # mixed input, e.g. [(lo, hi), Limits(...)]: numpy cannot convert Limits
+        if not isinstance(raw, np.ndarray):
+            raw = [
+                (item.min, item.max) if isinstance(item, Limits) else item
+                for item in raw
+            ]
         arr = np.asarray(raw, dtype=float)
 
         if arr.ndim == 1:
