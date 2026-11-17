@@ -445,7 +445,7 @@ class NDImage:
             )
         return new_shape, LimitsND(new_limits)
 
-    def resample_scale(self, factor, axes=None) -> NDImage:
+    def resample_scale(self, factor, axes=None, method="nearest") -> NDImage:
         """Scale the image by a given factor."""
         factors = [
             factor if (axes is None or dim in axes) else 1 for dim in range(self.ndim)
@@ -455,7 +455,7 @@ class NDImage:
             for dim_size, factor_for_dim in zip(self.shape, factors)
         ]
         new_limits = _collapse_limits_for_single_element_dims(self.limits, new_shape)
-        return self.resample(shape=new_shape, limits=new_limits, method="linear")
+        return self.resample(shape=new_shape, limits=new_limits, method=method)
 
     def get_window(self, limits) -> NDImage:
         """Returns a new image restricted to a physical-coordinate window.
